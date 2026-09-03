@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     youtube_api_key: str = ""
-    database_url: str = "postgresql://garimpo:garimpo@localhost:5432/garimpo"
+    database_url: str = "postgresql://garimpo:garimpo@localhost:5433/garimpo"
     dashboard_password: str = ""
     smtp_host: str = ""
     smtp_port: int = 587
