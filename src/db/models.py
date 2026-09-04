@@ -27,6 +27,9 @@ class Niche(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    # Usado para rodar a descoberta em rodízio entre os nichos, já que search.list
+    # é caro demais para rodar todos os nichos todo dia (docs/04-coleta-youtube.md).
+    last_discovery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     channels: Mapped[list["Channel"]] = relationship(back_populates="niche")
 
