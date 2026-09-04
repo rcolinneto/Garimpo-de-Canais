@@ -41,6 +41,30 @@ class Settings(BaseSettings):
     # Quantos vídeos recentes são analisados por canal em cada snapshot
     recent_videos_count: int = 10
 
+    # Motor de score — pesos ajustáveis sem mexer em código (ex.: "dar mais peso
+    # pra monetização"); devem somar 1.0.
+    score_weight_growth: float = 0.5
+    score_weight_monetization: float = 0.3
+    score_weight_niche: float = 0.2
+    # Janela de comparação de crescimento entre snapshots
+    growth_comparison_days: int = 7
+    # Piso do denominador da taxa: sem isso, +2 inscritos em um canal de 17 vira
+    # "crescimento de 12%" e domina o ranking sobre canais realmente relevantes.
+    growth_min_base: int = 1000
+    # Teto da extrapolação quando a janela disponível é menor que a de referência,
+    # para um único dia de sorte não virar uma taxa semanal explosiva.
+    growth_max_normalization_factor: float = 3.0
+    # Acima desse tamanho o canal já emergiu, então o crescimento pesa menos
+    growth_large_channel_subscribers: int = 500_000
+    growth_large_channel_factor: float = 0.5
+    # Sinais de monetização considerados "ativos" e escala do componente
+    monetization_window_days: int = 30
+    monetization_score_scale: float = 25.0
+    # Não regrava o mesmo sinal (tipo + evidência) detectado dentro desse período
+    monetization_signal_dedupe_days: int = 30
+    # Limiar público de inscritos do YouTube Partner Program
+    ypp_min_subscribers: int = 1000
+
     @property
     def youtube_api_key_pool(self) -> list[str]:
         """Chaves disponíveis, na ordem de uso (YOUTUBE_API_KEY primeiro)."""

@@ -10,7 +10,7 @@ gastas — é essa tabela que responde "a coleta rodou hoje?" (docs/07).
 
 import logging
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
@@ -21,8 +21,10 @@ from src.collectors.models import ChannelRef
 from src.collectors.youtube import QuotaExceededError, YouTubeCollector, is_relevant_candidate
 from src.config.logging import configure_logging
 from src.config.settings import settings
-from src.db.models import Channel, ChannelSnapshot, CollectionRun, Niche
+from src.db.models import Channel, ChannelSnapshot, CollectionRun, MonetizationSignal, Niche
 from src.db.session import SessionLocal
+from src.enrichment.monetization import dedupe_key, detect_signals
+from src.enrichment.scoring import run_enrichment
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,47 @@ def _snapshot_row(channel_id: int, snapshot) -> ChannelSnapshot:
         engagement_rate=snapshot.engagement_rate,
         raw_payload=payload,
     )
+
+
+def _persist_monetization_signals(
+    session, channel_id: int, ref: ChannelRef, collector: YouTubeCollector, snapshot
+) -> int:
+    """Detecta e grava sinais de monetização novos para o canal.
+
+    Um sinal já detectado recentemente não é regravado: a tabela existe para mostrar
+    *quando* o canal passou a monetizar, e uma linha por dia para o mesmo link só
+    esconderia essa informação.
+    """
+    content_signals = collector.fetch_recent_content_signals(ref)
+    detected = detect_signals(content_signals, snapshot)
+    if not detected:
+        return 0
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=settings.monetization_signal_dedupe_days)
+    recentes = {
+        dedupe_key(signal.signal_type, signal.evidence or "")
+        for signal in session.query(MonetizationSignal)
+        .filter(
+            MonetizationSignal.channel_id == channel_id,
+            MonetizationSignal.detected_at >= cutoff,
+        )
+        .all()
+    }
+
+    novos = 0
+    for signal in detected:
+        if dedupe_key(signal.signal_type, signal.evidence) in recentes:
+            continue
+        session.add(
+            MonetizationSignal(
+                channel_id=channel_id,
+                signal_type=signal.signal_type,
+                evidence=signal.evidence,
+                confidence=signal.confidence,
+            )
+        )
+        novos += 1
+    return novos
 
 
 def _register_candidates(session, collector: YouTubeCollector, refs, niche_id: int | None) -> int:
@@ -192,21 +235,35 @@ def run_snapshot_job() -> None:
                     display_name=channel.display_name,
                     url=channel.url,
                 )
-                snapshot = collector.fetch_snapshot(ref)
-                if snapshot is None:
-                    # Canal saiu do ar: marca como removido e preserva o histórico.
-                    channel.status = "removed"
-                    logger.info("Canal removido do YouTube: %s", channel.youtube_channel_id)
-                else:
-                    session.add(_snapshot_row(channel.id, snapshot))
-                    channel.display_name = snapshot.channel_ref.display_name or channel.display_name
-                    channel.handle = snapshot.channel_ref.handle or channel.handle
+                try:
+                    snapshot = collector.fetch_snapshot(ref)
+                    if snapshot is None:
+                        # Canal saiu do ar: marca como removido e preserva o histórico.
+                        channel.status = "removed"
+                        logger.info("Canal removido do YouTube: %s", channel.youtube_channel_id)
+                    else:
+                        session.add(_snapshot_row(channel.id, snapshot))
+                        channel.display_name = (
+                            snapshot.channel_ref.display_name or channel.display_name
+                        )
+                        channel.handle = snapshot.channel_ref.handle or channel.handle
+                        # Os textos recentes já estão em cache do snapshot: 0 unidades.
+                        _persist_monetization_signals(session, channel.id, ref, collector, snapshot)
+                except QuotaExceededError as error:
+                    # Interrompe a coleta, mas ainda enriquece o que já foi coletado.
+                    status = "partial"
+                    error_message = str(error)
+                    logger.warning(
+                        "Snapshot interrompido por cota após %d canais: %s", processed, error
+                    )
+                    break
                 session.commit()
                 processed += 1
-    except QuotaExceededError as error:
-        status = "partial"
-        error_message = str(error)
-        logger.warning("Snapshot interrompido por cota após %d canais: %s", processed, error)
+
+            # Enriquecimento roda logo após o snapshot (docs/05): sinais de
+            # monetização já gravados acima, scores calculados agora.
+            run_enrichment(session)
+            session.commit()
     except Exception as error:  # noqa: BLE001
         status = "failed"
         error_message = str(error)
@@ -257,9 +314,18 @@ def start_scheduler() -> None:
     scheduler.start()
 
 
+def run_enrichment_job() -> None:
+    """Recalcula os scores sem coletar nada — útil após ajustar os pesos."""
+    with SessionLocal() as session:
+        scored = run_enrichment(session)
+        session.commit()
+    logger.info("Enriquecimento manual concluído: %d canais pontuados", scored)
+
+
 COMMANDS = {
     "discovery": run_discovery_job,
     "snapshot": run_snapshot_job,
+    "enrichment": run_enrichment_job,
     "start": start_scheduler,
 }
 
