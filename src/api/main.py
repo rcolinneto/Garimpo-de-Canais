@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from sqlalchemy import func
 
 from src.api import queries
 from src.api.schemas import (
@@ -9,8 +10,11 @@ from src.api.schemas import (
     CanalItem,
     HistoricoCanal,
     ListaCanais,
+    NichoCreate,
     NichoHistoricoPonto,
     NichoRankingItem,
+    NichoResposta,
+    NichoUpdate,
     ScorePonto,
     SinalMonetizacao,
     SnapshotPonto,
@@ -230,6 +234,59 @@ def ranking_de_nichos(
         )
         for row in queries.niches_ranking(session, only_active=only_active)
     ]
+
+
+def _normalizar_keywords(keywords: list[str]) -> list[str]:
+    return [palavra.strip() for palavra in keywords if palavra.strip()]
+
+
+def _nome_ja_usado(session, nome: str, ignorar_id: int | None = None) -> bool:
+    query = session.query(Niche).filter(func.lower(Niche.name) == nome.lower())
+    if ignorar_id is not None:
+        query = query.filter(Niche.id != ignorar_id)
+    return query.first() is not None
+
+
+@app.post("/nichos", response_model=NichoResposta, status_code=201)
+def criar_nicho(payload: NichoCreate, session=Depends(get_session)) -> Niche:
+    """Tela 4 — cadastra um nicho novo."""
+    nome = payload.name.strip()
+    if _nome_ja_usado(session, nome):
+        raise HTTPException(status_code=409, detail="Já existe um nicho com esse nome")
+
+    nicho = Niche(
+        name=nome, keywords=_normalizar_keywords(payload.keywords), active=payload.active
+    )
+    session.add(nicho)
+    session.commit()
+    session.refresh(nicho)
+    logger.info("Nicho criado: %s (id=%s)", nicho.name, nicho.id)
+    return nicho
+
+
+@app.put("/nichos/{niche_id}", response_model=NichoResposta)
+def atualizar_nicho(
+    niche_id: int, payload: NichoUpdate, session=Depends(get_session)
+) -> Niche:
+    """Tela 4 — edita ou pausa um nicho (pausar = active=false, preserva histórico)."""
+    nicho = session.get(Niche, niche_id)
+    if nicho is None:
+        raise HTTPException(status_code=404, detail="Nicho não encontrado")
+
+    if payload.name is not None:
+        nome = payload.name.strip()
+        if _nome_ja_usado(session, nome, ignorar_id=niche_id):
+            raise HTTPException(status_code=409, detail="Já existe um nicho com esse nome")
+        nicho.name = nome
+    if payload.keywords is not None:
+        nicho.keywords = _normalizar_keywords(payload.keywords)
+    if payload.active is not None:
+        nicho.active = payload.active
+
+    session.commit()
+    session.refresh(nicho)
+    logger.info("Nicho atualizado: %s (id=%s, active=%s)", nicho.name, nicho.id, nicho.active)
+    return nicho
 
 
 @app.get("/nichos/{niche_id}/historico", response_model=list[NichoHistoricoPonto])

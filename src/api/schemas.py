@@ -1,8 +1,8 @@
-"""Modelos de resposta da API interna (docs/06-dashboard.md)."""
+"""Modelos de requisição e resposta da API interna (docs/06-dashboard.md)."""
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SinalMonetizacao(BaseModel):
@@ -97,3 +97,34 @@ class NichoRankingItem(BaseModel):
 class NichoHistoricoPonto(BaseModel):
     dia: datetime
     niche_virality_score: float | None = None
+
+
+class NichoCreate(BaseModel):
+    """Payload da Tela 4 ao cadastrar um nicho."""
+
+    name: str = Field(min_length=1, max_length=200)
+    keywords: list[str] = Field(default_factory=list)
+    active: bool = True
+
+
+class NichoUpdate(BaseModel):
+    """Edição parcial: só os campos enviados são alterados.
+
+    `active=false` é como se pausa um nicho sem apagar o histórico
+    (docs/03-modelo-de-dados.md).
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    keywords: list[str] | None = None
+    active: bool | None = None
+
+
+class NichoResposta(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    keywords: list[str] | None = None
+    active: bool
+    created_at: datetime
+    last_discovery_at: datetime | None = None

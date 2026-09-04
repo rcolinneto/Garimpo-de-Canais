@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://garimpo:garimpo@localhost:5433/garimpo"
     dashboard_password: str = ""
+    # De onde o dashboard consome os dados (nunca do banco direto, ver docs/02)
+    api_base_url: str = "http://localhost:8010"
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_user: str = ""

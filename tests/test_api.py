@@ -161,7 +161,9 @@ def api():
         pytest.skip(f"Postgres indisponível para testes de integração: {error}")
 
     transaction = connection.begin()
-    session = sessionmaker(bind=connection)()
+    # create_savepoint: os endpoints de escrita chamam commit(), e sem isso o
+    # commit deles encerraria a transação externa, furando o rollback do teste.
+    session = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")()
     ids = _seed(session)
     app.dependency_overrides[get_session] = lambda: session
 
@@ -301,3 +303,82 @@ def test_historico_de_nicho_inexistente_da_404(api):
     client, _ = api
 
     assert client.get("/nichos/999999/historico").status_code == 404
+
+
+def test_cria_nicho(api):
+    client, _ = api
+
+    resposta = client.post(
+        "/nichos", json={"name": "  culinária fitness  ", "keywords": ["marmita fit", " low carb "]}
+    )
+
+    assert resposta.status_code == 201
+    corpo = resposta.json()
+    # Nome e keywords chegam normalizados, sem espaços sobrando
+    assert corpo["name"] == "culinária fitness"
+    assert corpo["keywords"] == ["marmita fit", "low carb"]
+    assert corpo["active"] is True
+    # O nicho novo aparece na listagem consumida pela Tela 4
+    nomes = [item["name"] for item in client.get("/nichos/ranking").json()]
+    assert "culinária fitness" in nomes
+
+
+def test_cria_nicho_com_payload_invalido(api):
+    client, _ = api
+
+    sem_nome = client.post("/nichos", json={"keywords": ["algo"]})
+    nome_vazio = client.post("/nichos", json={"name": ""})
+    tipo_errado = client.post("/nichos", json={"name": "x", "keywords": "não é lista"})
+
+    assert sem_nome.status_code == 422
+    assert nome_vazio.status_code == 422
+    assert tipo_errado.status_code == 422
+
+
+def test_nao_permite_dois_nichos_com_o_mesmo_nome(api):
+    client, _ = api
+
+    duplicado = client.post("/nichos", json={"name": "FINANÇAS (TESTE)"})
+
+    assert duplicado.status_code == 409
+
+
+def test_edita_nicho(api):
+    client, ids = api
+
+    resposta = client.put(
+        f"/nichos/{ids['nicho_pets']}",
+        json={"name": "pets exóticos revisado", "keywords": ["répteis"]},
+    )
+
+    assert resposta.status_code == 200
+    assert resposta.json()["name"] == "pets exóticos revisado"
+    assert resposta.json()["keywords"] == ["répteis"]
+    # Edição parcial não mexe no que não foi enviado
+    assert resposta.json()["active"] is True
+
+
+def test_pausar_nicho_preserva_o_historico(api):
+    client, ids = api
+
+    resposta = client.put(f"/nichos/{ids['nicho_financas']}", json={"active": False})
+
+    assert resposta.status_code == 200
+    assert resposta.json()["active"] is False
+    # Pausar não apaga: o nicho e seus canais continuam consultáveis
+    ranking = {item["niche_id"]: item for item in client.get("/nichos/ranking").json()}
+    assert ranking[ids["nicho_financas"]]["canais_ativos"] == 1
+
+
+def test_edita_nicho_inexistente_da_404(api):
+    client, _ = api
+
+    assert client.put("/nichos/999999", json={"active": False}).status_code == 404
+
+
+def test_edicao_com_payload_invalido(api):
+    client, ids = api
+
+    resposta = client.put(f"/nichos/{ids['nicho_pets']}", json={"active": "talvez"})
+
+    assert resposta.status_code == 422

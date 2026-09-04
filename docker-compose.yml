@@ -35,5 +35,23 @@ services:
       db:
         condition: service_healthy
 
+  dashboard:
+    build: .
+    restart: unless-stopped
+    command:
+      - streamlit
+      - run
+      - src/dashboard/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+    environment:
+      # Consome a API pela rede interna do compose, nunca o banco direto.
+      API_BASE_URL: http://app:8000
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
+    ports:
+      - "${DASHBOARD_HOST_PORT:-8501}:8501"
+    depends_on:
+      - app
+
 volumes:
   db_data:
