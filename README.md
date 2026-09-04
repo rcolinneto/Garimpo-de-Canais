@@ -18,14 +18,17 @@ Este pacote é a especificação completa do projeto, dividida em partes, pensad
 
 | Arquivo | Conteúdo |
 |---|---|
+| [`docs/00-brainstorm-e-alinhamento.md`](docs/00-brainstorm-e-alinhamento.md) | Etapa 1: pedido original, perguntas de alinhamento, opções descartadas e por quê |
 | [`docs/01-visao-geral-e-escopo.md`](docs/01-visao-geral-e-escopo.md) | Objetivo, escopo e critérios de sucesso |
 | [`docs/02-arquitetura.md`](docs/02-arquitetura.md) | Arquitetura geral, componentes, stack técnica, diagrama |
 | [`docs/03-modelo-de-dados.md`](docs/03-modelo-de-dados.md) | Schema do banco de dados |
 | [`docs/04-coleta-youtube.md`](docs/04-coleta-youtube.md) | Módulo de coleta do YouTube (estratégia de cota, descoberta e snapshot) |
 | [`docs/05-motor-monetizacao-e-score.md`](docs/05-motor-monetizacao-e-score.md) | Detecção de monetização e score de "nicho viral" |
 | [`docs/06-dashboard.md`](docs/06-dashboard.md) | Especificação do dashboard web |
-| [`docs/07-infraestrutura-e-operacao.md`](docs/07-infraestrutura-e-operacao.md) | Deploy, agendamento, custos, segurança |
+| [`docs/07-infraestrutura-e-operacao.md`](docs/07-infraestrutura-e-operacao.md) | Deploy, agendamento, custos, segurança, backup e restore |
 | [`docs/08-roadmap-de-fases.md`](docs/08-roadmap-de-fases.md) | Divisão em fases com prompts prontos para o Claude Code |
+| [`docs/09-requisitos-nao-funcionais.md`](docs/09-requisitos-nao-funcionais.md) | Checklist consolidado de performance, segurança, custo e escalabilidade |
+| [`docs/10-validacao-e-ajustes.md`](docs/10-validacao-e-ajustes.md) | Etapa 5: validação pós-entrega contra critérios de aceite e processo de ajuste |
 
 ## Resumo para quem vai apresentar isso ao chefe
 

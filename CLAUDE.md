@@ -1,15 +1,22 @@
 # Garimpo de Canais — Instruções para o Claude Code
 
-Este projeto constrói um sistema que descobre automaticamente canais do YouTube em crescimento que estão monetizando nichos virais, com um dashboard web de acompanhamento.
+## Contexto de negócio
+
+- **Dono do produto**: o chefe de Renato (patrocinador do pedido), na agência de marketing onde Renato trabalha como analista. É quem consome o resultado final via dashboard e para quem os critérios de sucesso devem fazer sentido.
+- **Executor/mantenedor**: Renato, com apoio do Claude Code para implementação.
+- **Objetivo**: um radar automático de canais do YouTube em crescimento que estão monetizando nichos virais — insumo para identificar oportunidades de conteúdo e formatos/modelos de monetização que já estão funcionando para outros criadores.
+- **Como se relaciona com a operação da agência**: este sistema é **insumo para estratégia de conteúdo** (o que produzir, em qual nicho, com qual abordagem de monetização) — **não é uma ferramenta de gestão de campanha** (não substitui, nem se integra com, ferramentas de mídia paga, relatórios de cliente ou operação de tráfego pago da agência). Não expandir o escopo para essas funções sem uma nova rodada de alinhamento explícita (ver `docs/00-brainstorm-e-alinhamento.md`).
 
 ## Antes de qualquer tarefa
 
-Toda a especificação do projeto está em `docs/`. Antes de implementar qualquer parte, leia:
-1. `docs/01-visao-geral-e-escopo.md` — objetivo e escopo.
-2. `docs/02-arquitetura.md` — arquitetura, stack e estrutura de pastas obrigatória.
-3. O documento específico da fase que está sendo trabalhada (`docs/08-roadmap-de-fases.md` indica qual ler para cada fase).
+Toda a especificação do projeto está em `docs/`. Antes de implementar qualquer parte, leia, na ordem:
+1. `docs/00-brainstorm-e-alinhamento.md` — como o escopo chegou a ser o que é hoje (inclui decisões descartadas, para não serem re-propostas sem necessidade).
+2. `docs/01-visao-geral-e-escopo.md` — objetivo, escopo e critérios de sucesso.
+3. `docs/02-arquitetura.md` — arquitetura, stack e estrutura de pastas obrigatória.
+4. `docs/09-requisitos-nao-funcionais.md` — checklist de requisitos não-funcionais (performance, segurança, custo) que qualquer implementação deve respeitar.
+5. O documento específico da fase que está sendo trabalhada (`docs/08-roadmap-de-fases.md` indica qual ler para cada fase).
 
-Trabalhe **uma fase do roadmap por vez** (`docs/08-roadmap-de-fases.md`).
+Trabalhe **uma fase do roadmap por vez** (`docs/08-roadmap-de-fases.md`). Ao final de cada fase, rodar o checklist de `docs/10-validacao-e-ajustes.md` antes de marcar como concluída.
 
 ## Convenções do projeto
 
@@ -23,5 +30,7 @@ Trabalhe **uma fase do roadmap por vez** (`docs/08-roadmap-de-fases.md`).
 ## Ao terminar uma fase
 
 - Rodar `docker-compose up` e validar manualmente que o que foi construído funciona de ponta a ponta.
+- Rodar o checklist de validação por fase em `docs/10-validacao-e-ajustes.md`.
 - Atualizar `.env.example` se novas variáveis foram introduzidas.
+- Se a fase revelar necessidade de mudar escopo (não só implementação), registrar isso como uma nova rodada de alinhamento antes de implementar — não mudar o PRD silenciosamente (ver processo de ajuste em `docs/10-validacao-e-ajustes.md`).
 - Resumir no fim da sessão o que foi implementado e qual é a próxima fase, conforme `docs/08-roadmap-de-fases.md`.
