@@ -115,6 +115,25 @@ def api_falsa(monkeypatch):
         "historico_do_nicho",
         lambda niche_id, days=90: [{"dia": "2026-09-04T00:00:00+00:00", "niche_virality_score": 10.0}],
     )
+    monkeypatch.setattr(
+        api_client,
+        "config_de_alertas",
+        lambda: {"limiar": 50.0, "email_configurado": True, "destinatarios": ["chefe@exemplo.com"]},
+    )
+    monkeypatch.setattr(
+        api_client,
+        "listar_alertas",
+        lambda limit=100: [
+            {
+                "id": 1,
+                "channel_id": 1,
+                "channel_name": "Canal Teste",
+                "triggered_at": "2026-09-05T12:00:00+00:00",
+                "reason": "score 60.0 cruzou o limiar de 50.0",
+                "channel_out": "email",
+            }
+        ],
+    )
 
 
 def rodar(autenticado: bool = True) -> AppTest:
@@ -221,6 +240,31 @@ def test_tela_detalhe_mostra_evidencia_do_sinal():
         tabela["Evidência"].tolist() for tabela in tabelas if "Evidência" in getattr(tabela, "columns", [])
     ]
     assert ["https://hotmart.com/curso"] in evidencias
+
+
+def test_tela_alertas_mostra_limiar_e_historico():
+    app = rodar_tela("tela_alertas")
+
+    rotulos = [metrica.label for metrica in app.metric]
+    assert "Limiar configurado" in rotulos
+    assert "Envio por e-mail" in rotulos
+    tabelas = [tabela.value for tabela in app.dataframe]
+    motivos = [
+        tabela["Motivo"].tolist() for tabela in tabelas if "Motivo" in getattr(tabela, "columns", [])
+    ]
+    assert ["score 60.0 cruzou o limiar de 50.0"] in motivos
+
+
+def test_tela_alertas_avisa_quando_smtp_nao_esta_configurado(monkeypatch):
+    monkeypatch.setattr(
+        api_client,
+        "config_de_alertas",
+        lambda: {"limiar": 50.0, "email_configurado": False, "destinatarios": []},
+    )
+
+    app = rodar_tela("tela_alertas")
+
+    assert any("SMTP não configurado" in aviso.value for aviso in app.warning)
 
 
 def test_tela_nichos_usa_a_api_para_criar(monkeypatch):

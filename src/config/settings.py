@@ -22,8 +22,12 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    smtp_use_tls: bool = True
     alert_email_from: str = ""
+    # Aceita vários destinatários separados por vírgula
     alert_email_to: str = ""
+    # Score a partir do qual um canal vira alerta
+    alert_score_threshold: float = 50.0
 
     # Agendamento dos jobs (cron de 5 campos)
     scheduler_enabled: bool = True

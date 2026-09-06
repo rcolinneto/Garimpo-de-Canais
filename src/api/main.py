@@ -6,6 +6,8 @@ from sqlalchemy import func
 
 from src.api import queries
 from src.api.schemas import (
+    AlertaConfig,
+    AlertaEnviado,
     CanalDetalhe,
     CanalItem,
     HistoricoCanal,
@@ -24,6 +26,7 @@ from src.config.logging import configure_logging
 from src.config.settings import settings
 from src.db.models import Channel, Niche
 from src.db.session import SessionLocal
+from src.scheduler.alerts import destinatarios, smtp_configurado
 from src.scheduler.jobs import build_background_scheduler
 
 configure_logging()
@@ -234,6 +237,34 @@ def ranking_de_nichos(
         )
         for row in queries.niches_ranking(session, only_active=only_active)
     ]
+
+
+@app.get("/alertas", response_model=list[AlertaEnviado])
+def listar_alertas(
+    limit: int = Query(100, ge=1, le=500), session=Depends(get_session)
+) -> list[AlertaEnviado]:
+    """Tela 5 — histórico de alertas já disparados."""
+    return [
+        AlertaEnviado(
+            id=row.id,
+            channel_id=row.channel_id,
+            channel_name=row.channel_name,
+            triggered_at=row.triggered_at,
+            reason=row.reason,
+            channel_out=row.channel_out,
+        )
+        for row in queries.alerts_sent(session, limit)
+    ]
+
+
+@app.get("/alertas/config", response_model=AlertaConfig)
+def configuracao_de_alertas() -> AlertaConfig:
+    """Tela 5 — limiar vigente e se o envio por e-mail está de fato configurado."""
+    return AlertaConfig(
+        limiar=settings.alert_score_threshold,
+        email_configurado=smtp_configurado(),
+        destinatarios=destinatarios(),
+    )
 
 
 def _normalizar_keywords(keywords: list[str]) -> list[str]:

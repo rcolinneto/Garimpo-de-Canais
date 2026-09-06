@@ -25,6 +25,7 @@ from src.db.models import Channel, ChannelSnapshot, CollectionRun, MonetizationS
 from src.db.session import SessionLocal
 from src.enrichment.monetization import dedupe_key, detect_signals
 from src.enrichment.scoring import run_enrichment
+from src.scheduler.alerts import alertar_falha_de_job, run_alerts_job
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ def _persist_run(
             )
         )
         session.commit()
+
+    # docs/09: falha de job avisa por e-mail, para não se descobrir dias depois
+    # que o dashboard está desatualizado. `partial` não entra aqui porque parar
+    # por cota é comportamento previsto, não falha.
+    if status == "failed":
+        alertar_falha_de_job(job_type, error_message)
 
 
 def _snapshot_row(channel_id: int, snapshot) -> ChannelSnapshot:
@@ -264,6 +271,13 @@ def run_snapshot_job() -> None:
             # monetização já gravados acima, scores calculados agora.
             run_enrichment(session)
             session.commit()
+
+        # Alertas rodam depois do cálculo de score, em sessão própria, e uma falha
+        # de e-mail não pode invalidar a coleta que já deu certo.
+        try:
+            run_alerts_job()
+        except Exception:  # noqa: BLE001
+            logger.exception("Falha ao processar alertas após o snapshot")
     except Exception as error:  # noqa: BLE001
         status = "failed"
         error_message = str(error)
@@ -326,6 +340,7 @@ COMMANDS = {
     "discovery": run_discovery_job,
     "snapshot": run_snapshot_job,
     "enrichment": run_enrichment_job,
+    "alerts": run_alerts_job,
     "start": start_scheduler,
 }
 

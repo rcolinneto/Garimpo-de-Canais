@@ -401,19 +401,34 @@ def tela_nichos() -> None:
 
 def tela_alertas() -> None:
     st.title("Alertas e Relatórios")
-    st.info(
-        "O disparo automático de e-mail entra na Fase 6 do roadmap. Aqui já dá para "
-        "definir o limiar e ver quais canais o cruzariam hoje."
+
+    config = carregar(api_client.config_de_alertas)
+    if config is None:
+        return
+
+    limiar_vigente = config["limiar"]
+    colunas = st.columns(2)
+    colunas[0].metric("Limiar configurado", limiar_vigente)
+    colunas[1].metric("Envio por e-mail", "ativo" if config["email_configurado"] else "não configurado")
+    if config["email_configurado"]:
+        st.caption(f"Alertas vão para: {', '.join(config['destinatarios'])}")
+    else:
+        st.warning(
+            "SMTP não configurado: os alertas continuam sendo registrados e aparecem "
+            "aqui embaixo, mas nenhum e-mail sai."
+        )
+    st.caption(
+        "O limiar vigente vem da variável de ambiente ALERT_SCORE_THRESHOLD. "
+        "Use o campo abaixo para simular outro valor antes de alterá-la."
     )
 
     limiar = st.number_input(
-        "Limiar de score para alerta",
+        "Simular limiar",
         min_value=0.0,
         max_value=100.0,
-        value=float(st.session_state.get("limiar_alerta", 50.0)),
+        value=float(limiar_vigente),
         step=5.0,
     )
-    st.session_state["limiar_alerta"] = limiar
 
     dados = carregar(api_client.listar_canais, min_score=limiar, limit=200)
     if dados is None:
@@ -430,10 +445,25 @@ def tela_alertas() -> None:
         st.write("Nenhum canal cruzou esse limiar até agora.")
 
     st.subheader("Histórico de alertas enviados")
-    st.write(
-        "Nenhum alerta enviado — o job de envio e a tabela `alerts_sent` passam a "
-        "alimentar esta lista na Fase 6."
-    )
+    alertas = carregar(api_client.listar_alertas)
+    if alertas:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Canal": alerta["channel_name"] or alerta["channel_id"],
+                        "Quando": (alerta["triggered_at"] or "")[:19].replace("T", " "),
+                        "Motivo": alerta["reason"],
+                        "Via": "e-mail" if alerta["channel_out"] == "email" else "só dashboard",
+                    }
+                    for alerta in alertas
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.write("Nenhum alerta disparado até agora.")
 
 
 # --- navegação --------------------------------------------------------------

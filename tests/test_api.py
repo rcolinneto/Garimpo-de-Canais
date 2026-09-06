@@ -15,7 +15,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.api.main import app, get_session
-from src.db.models import Channel, ChannelScore, ChannelSnapshot, MonetizationSignal, Niche
+from src.db.models import (
+    AlertSent,
+    Channel,
+    ChannelScore,
+    ChannelSnapshot,
+    MonetizationSignal,
+    Niche,
+)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localhost:5433/garimpo")
 
@@ -28,7 +35,7 @@ def _limpar(session) -> None:
     Seguro porque tudo roda dentro de uma transação que é revertida no fim do
     teste — os dados reais coletados continuam intactos no banco.
     """
-    for modelo in (ChannelScore, MonetizationSignal, ChannelSnapshot, Channel, Niche):
+    for modelo in (AlertSent, ChannelScore, MonetizationSignal, ChannelSnapshot, Channel, Niche):
         session.query(modelo).delete()
     session.flush()
 
@@ -132,6 +139,14 @@ def _seed(session) -> dict:
         ]
     )
 
+    session.add(
+        AlertSent(
+            channel_id=canal_top.id,
+            triggered_at=AGORA - timedelta(hours=2),
+            reason="score 29.0 cruzou o limiar de 25.0",
+            channel_out="email",
+        )
+    )
     session.add(
         MonetizationSignal(
             channel_id=canal_top.id,
@@ -303,6 +318,27 @@ def test_historico_de_nicho_inexistente_da_404(api):
     client, _ = api
 
     assert client.get("/nichos/999999/historico").status_code == 404
+
+
+def test_lista_alertas_enviados(api):
+    client, ids = api
+
+    dados = client.get("/alertas").json()
+
+    assert len(dados) == 1
+    assert dados[0]["channel_name"] == "Canal Top"
+    assert dados[0]["channel_out"] == "email"
+    assert "cruzou o limiar" in dados[0]["reason"]
+
+
+def test_config_de_alertas_informa_limiar_e_situacao_do_email(api):
+    client, _ = api
+
+    config = client.get("/alertas/config").json()
+
+    assert isinstance(config["limiar"], (int, float))
+    assert isinstance(config["email_configurado"], bool)
+    assert isinstance(config["destinatarios"], list)
 
 
 def test_cria_nicho(api):

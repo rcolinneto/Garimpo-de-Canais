@@ -10,7 +10,14 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import Select, and_, case, exists, func, lateral, select, true
 
 from src.config.settings import settings
-from src.db.models import Channel, ChannelScore, ChannelSnapshot, MonetizationSignal, Niche
+from src.db.models import (
+    AlertSent,
+    Channel,
+    ChannelScore,
+    ChannelSnapshot,
+    MonetizationSignal,
+    Niche,
+)
 
 
 def _latest_snapshots():
@@ -231,6 +238,24 @@ def niches_ranking(session, only_active: bool = False) -> list:
     if only_active:
         stmt = stmt.where(Niche.active.is_(True))
     return session.execute(stmt).all()
+
+
+def alerts_sent(session, limit: int = 100) -> list:
+    """Histórico de alertas disparados, com o nome do canal (Tela 5)."""
+    return session.execute(
+        select(
+            AlertSent.id,
+            AlertSent.channel_id,
+            Channel.display_name.label("channel_name"),
+            AlertSent.triggered_at,
+            AlertSent.reason,
+            AlertSent.channel_out,
+        )
+        .select_from(AlertSent)
+        .outerjoin(Channel, Channel.id == AlertSent.channel_id)
+        .order_by(AlertSent.triggered_at.desc())
+        .limit(limit)
+    ).all()
 
 
 def niche_history(session, niche_id: int, days: int = 90) -> list:

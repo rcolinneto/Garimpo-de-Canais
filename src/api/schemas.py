@@ -99,6 +99,24 @@ class NichoHistoricoPonto(BaseModel):
     niche_virality_score: float | None = None
 
 
+class AlertaEnviado(BaseModel):
+    id: int
+    channel_id: int
+    channel_name: str | None = None
+    triggered_at: datetime
+    reason: str | None = None
+    # email | dashboard_only
+    channel_out: str
+
+
+class AlertaConfig(BaseModel):
+    """Como o alerta está configurado hoje (Tela 5)."""
+
+    limiar: float
+    email_configurado: bool
+    destinatarios: list[str]
+
+
 class NichoCreate(BaseModel):
     """Payload da Tela 4 ao cadastrar um nicho."""
 

@@ -77,5 +77,13 @@ def atualizar_nicho(niche_id: int, **campos) -> dict:
     return _requisitar("PUT", f"/nichos/{niche_id}", json=campos)
 
 
+def listar_alertas(limit: int = 100) -> list[dict]:
+    return _requisitar("GET", "/alertas", params={"limit": limit})
+
+
+def config_de_alertas() -> dict:
+    return _requisitar("GET", "/alertas/config")
+
+
 def health() -> dict:
     return _requisitar("GET", "/health")
