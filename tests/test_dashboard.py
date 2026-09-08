@@ -162,6 +162,35 @@ def test_sem_login_o_dashboard_nao_mostra_dados():
     assert len(app.dataframe) == 0
 
 
+def test_landing_explica_o_produto_antes_do_login():
+    app = rodar(autenticado=False)
+
+    texto = " ".join(
+        [bloco.value for bloco in app.markdown]
+        + [bloco.value for bloco in app.caption]
+        + [bloco.value for bloco in app.title]
+        + [bloco.value for bloco in app.subheader]
+    )
+    assert "Garimpo de Canais" in texto
+    assert "Descobre" in texto and "Detecta monetização" in texto
+    # A ressalva de que monetização é estimativa precisa aparecer antes de entrar
+    assert any("estima" in aviso.value for aviso in app.info)
+    assert any(botao.label == "Entrar" for botao in app.button)
+
+
+def test_landing_nao_vaza_dados_antes_do_login(monkeypatch):
+    """A tela de entrada é pública; os números da empresa não podem estar nela."""
+    chamadas = []
+    for nome in ("listar_canais", "ranking_de_nichos", "listar_alertas", "config_de_alertas"):
+        monkeypatch.setattr(
+            api_client, nome, lambda *a, _n=nome, **k: chamadas.append(_n) or {"total": 0, "items": []}
+        )
+
+    rodar(autenticado=False)
+
+    assert chamadas == []
+
+
 def test_senha_errada_nao_autentica():
     app = rodar(autenticado=False)
 

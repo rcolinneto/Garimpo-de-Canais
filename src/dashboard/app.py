@@ -30,12 +30,64 @@ TIPOS_DE_SINAL = [
 # --- autenticação -----------------------------------------------------------
 
 
+def _apresentacao() -> None:
+    """Explica o que o sistema faz para quem chega sem contexto.
+
+    De propósito não mostra nenhum número real: o dashboard fica atrás de senha
+    justamente porque expõe análise de mercado (docs/09), e a tela de entrada é
+    pública para quem alcança a URL.
+    """
+    st.title("📡 Garimpo de Canais")
+    st.subheader("Um radar de canais do YouTube que estão crescendo e já monetizando")
+    st.write(
+        "O sistema procura, sozinho e todos os dias, canais pequenos que estão em "
+        "trajetória de crescimento dentro dos nichos que você configurou — e checa "
+        "quais deles já dão sinais de estar ganhando dinheiro. Serve para enxergar "
+        "que nichos e formatos estão funcionando enquanto ainda há espaço neles."
+    )
+
+    st.divider()
+    st.markdown("#### O que ele faz")
+    colunas = st.columns(4)
+    blocos = [
+        ("🔎", "Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho."),
+        ("📈", "Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo."),
+        ("💰", "Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência de cada achado."),
+        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um score único, para você saber o que olhar primeiro."),
+    ]
+    for coluna, (icone, titulo, texto) in zip(colunas, blocos):
+        coluna.markdown(f"##### {icone} {titulo}")
+        coluna.caption(texto)
+
+    st.divider()
+    st.markdown("#### O que você encontra lá dentro")
+    st.markdown(
+        "- **Visão Geral** — quais nichos estão mais aquecidos agora\n"
+        "- **Canais Descobertos** — a tabela de trabalho, com filtros por nicho, tamanho, "
+        "crescimento, sinais de monetização e data de descoberta; exporta para CSV\n"
+        "- **Detalhe do Canal** — evolução de inscritos e views em gráfico, e cada sinal "
+        "de monetização com o link ou trecho que o gerou\n"
+        "- **Configuração de Nichos** — cadastre ou pause nichos sem depender de ninguém\n"
+        "- **Alertas** — avisa por e-mail quando um canal cruza o score que você definir"
+    )
+
+    st.info(
+        "**Uma ressalva importante:** o sistema **estima** monetização por evidência "
+        "indireta — um link de pagamento na descrição, um e-book anunciado. Ele nunca "
+        "sabe quanto um canal de terceiros realmente fatura, e nenhuma ferramenta do "
+        "mercado sabe. Por isso cada sinal vem com a evidência que o gerou, para você "
+        "conferir antes de decidir qualquer coisa."
+    )
+    st.divider()
+
+
 def autenticar() -> bool:
     """Senha compartilhada via variável de ambiente (docs/06, seção Autenticação)."""
     if st.session_state.get("autenticado"):
         return True
 
-    st.title("Garimpo de Canais")
+    _apresentacao()
+
     if not settings.dashboard_password:
         # Falha fechada: o dashboard expõe análise de mercado da empresa, então
         # ficar aberto por falta de configuração seria pior que não subir.
@@ -45,9 +97,11 @@ def autenticar() -> bool:
         )
         return False
 
-    with st.form("login"):
+    esquerda, _ = st.columns([1, 2])
+    with esquerda.form("login"):
+        st.markdown("##### Acessar o dashboard")
         senha = st.text_input("Senha", type="password")
-        if st.form_submit_button("Entrar"):
+        if st.form_submit_button("Entrar", type="primary", use_container_width=True):
             if hmac.compare_digest(senha, settings.dashboard_password):
                 st.session_state["autenticado"] = True
                 st.rerun()
