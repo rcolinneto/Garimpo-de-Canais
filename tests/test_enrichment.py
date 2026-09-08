@@ -210,13 +210,53 @@ def test_monetization_score_pesa_sinais_fortes_acima_dos_fracos():
     assert forte > fraco
 
 
+def test_repetir_o_mesmo_tipo_de_sinal_nao_inflaciona_o_score():
+    """Um link de afiliado repetido em 20 vídeos é um sinal, não vinte."""
+    uma_vez, _ = calculate_monetization_score([FakeSignal("link_afiliado", 0.9)])
+    vinte_vezes, detalhe = calculate_monetization_score(
+        [FakeSignal("link_afiliado", 0.9) for _ in range(20)]
+    )
+
+    assert vinte_vezes == uma_vez
+    assert detalhe["ocorrencias_por_tipo"] == {"link_afiliado": 20}
+
+
+def test_sinal_fraco_repetido_nao_supera_um_sinal_forte():
+    """Caso real: canal de professor dizia 'aula' 9 vezes e passava quem vendia."""
+    professor, _ = calculate_monetization_score(
+        [FakeSignal("infoproduto", 0.4) for _ in range(9)]
+    )
+    quem_vende, _ = calculate_monetization_score([FakeSignal("link_afiliado", 0.9)])
+
+    assert professor < quem_vende
+
+
+def test_tipos_diferentes_somam():
+    um_tipo, _ = calculate_monetization_score([FakeSignal("link_afiliado", 0.9)])
+    dois_tipos, _ = calculate_monetization_score(
+        [FakeSignal("link_afiliado", 0.9), FakeSignal("loja_propria", 0.85)]
+    )
+
+    assert dois_tipos > um_tipo
+
+
 def test_monetization_score_limitado_a_100():
-    sinais = [FakeSignal("link_afiliado", 0.9) for _ in range(20)]
+    sinais = [
+        FakeSignal(tipo, 1.0)
+        for tipo in (
+            "link_afiliado",
+            "loja_propria",
+            "infoproduto",
+            "comunidade_paga",
+            "link_agregador",
+            "patrocinio_mencionado",
+        )
+    ]
 
     score, detalhe = calculate_monetization_score(sinais)
 
     assert score == 100.0
-    assert detalhe["sinais_considerados"] == 20
+    assert detalhe["sinais_considerados"] == 6
 
 
 def test_total_score_combina_os_tres_componentes_com_os_pesos():

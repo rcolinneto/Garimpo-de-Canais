@@ -241,6 +241,18 @@ def test_filtros_da_tela_2(api):
     assert por_crescimento["items"] == []
 
 
+def test_filtro_de_canais_novos_dos_ultimos_dias(api):
+    """Critério de sucesso de docs/01: ver o que surgiu nos últimos X dias."""
+    client, _ = api
+
+    recentes = client.get("/canais", params={"discovered_since_days": 7}).json()
+    antigos = client.get("/canais", params={"discovered_since_days": 90}).json()
+
+    # Canal Top foi descoberto há 3 dias; Canal Pequeno, há 40
+    assert [item["display_name"] for item in recentes["items"]] == ["Canal Top"]
+    assert len(antigos["items"]) == 2
+
+
 def test_paginacao_reporta_total(api):
     client, _ = api
 

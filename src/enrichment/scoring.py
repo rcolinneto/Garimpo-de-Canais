@@ -91,25 +91,35 @@ def calculate_growth_score(
 
 
 def calculate_monetization_score(signals: list[MonetizationSignal]) -> tuple[float, dict]:
-    """Soma ponderada dos sinais ativos, pela confiança de cada um."""
+    """Pontua a monetização pelos tipos de evidência encontrados.
+
+    Cada tipo conta pela evidência mais forte que o sustenta, e não pela soma de
+    todas. A versão anterior somava tudo, e sinais fracos repetidos se acumulavam:
+    um canal de professor que dizia "aula" nove vezes pontuava 72 — acima de
+    canais com link de pagamento real. O que indica monetização é *que tipos* de
+    evidência existem, não quantas vezes uma palavra aparece.
+    """
     if not signals:
         return 0.0, {"sinais_considerados": 0}
 
-    total = 0.0
     por_tipo: dict[str, float] = {}
+    ocorrencias: dict[str, int] = {}
     for signal in signals:
         weight = SIGNAL_TYPE_WEIGHTS.get(signal.signal_type, 0.5)
         contribution = float(signal.confidence or 0) * weight
-        total += contribution
-        por_tipo[signal.signal_type] = round(por_tipo.get(signal.signal_type, 0.0) + contribution, 4)
+        por_tipo[signal.signal_type] = max(por_tipo.get(signal.signal_type, 0.0), contribution)
+        ocorrencias[signal.signal_type] = ocorrencias.get(signal.signal_type, 0) + 1
 
+    total = sum(por_tipo.values())
     score = min(100.0, total * settings.monetization_score_scale)
     return score, {
         "sinais_considerados": len(signals),
-        "contribuicao_por_tipo": por_tipo,
+        "contribuicao_por_tipo": {tipo: round(valor, 4) for tipo, valor in por_tipo.items()},
+        "ocorrencias_por_tipo": ocorrencias,
         "soma_ponderada": round(total, 4),
         "escala": settings.monetization_score_scale,
         "janela_dias": settings.monetization_window_days,
+        "criterio": "cada tipo conta pela evidência mais forte",
     }
 
 

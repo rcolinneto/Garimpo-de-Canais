@@ -124,6 +124,9 @@ def listar_canais(
         None, description="Filtra canais com algum destes sinais de monetização"
     ),
     status: str | None = "active",
+    discovered_since_days: int | None = Query(
+        None, ge=1, description="Só canais descobertos nos últimos N dias"
+    ),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     session=Depends(get_session),
@@ -137,6 +140,7 @@ def listar_canais(
         min_score=min_score,
         signal_types=signal_types,
         status=status,
+        discovered_since_days=discovered_since_days,
     )
     total = queries.count_channels(session, stmt)
     rows = session.execute(stmt.limit(limit).offset(offset)).all()

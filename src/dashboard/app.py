@@ -178,6 +178,11 @@ def tela_canais() -> None:
         crescimento = st.number_input("Crescimento mín. 7d (%)", value=0.0, step=1.0)
         score_minimo = st.number_input("Score mínimo", min_value=0.0, value=0.0, step=1.0)
         sinais = st.multiselect("Sinais de monetização", TIPOS_DE_SINAL)
+        descobertos_em = st.selectbox(
+            "Descobertos nos últimos",
+            [None, 7, 15, 30, 90],
+            format_func=lambda d: "qualquer data" if d is None else f"{d} dias",
+        )
         limite = st.slider("Máximo de canais", min_value=10, max_value=200, value=50, step=10)
 
     dados = carregar(
@@ -188,6 +193,7 @@ def tela_canais() -> None:
         min_growth=crescimento or None,
         min_score=score_minimo or None,
         signal_types=sinais or None,
+        discovered_since_days=descobertos_em,
         limit=limite,
     )
     if dados is None:

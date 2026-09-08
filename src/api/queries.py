@@ -86,6 +86,7 @@ def build_channels_query(
     min_score: float | None = None,
     signal_types: list[str] | None = None,
     status: str | None = "active",
+    discovered_since_days: int | None = None,
 ) -> Select:
     """Listagem da Tela 2, com todos os filtros descritos em docs/06."""
     latest = _latest_snapshots()
@@ -140,6 +141,12 @@ def build_channels_query(
         stmt = stmt.where(latest.c.subscriber_count <= max_subscribers)
     if min_score is not None:
         stmt = stmt.where(scores.c.total_score >= min_score)
+    if discovered_since_days is not None:
+        # "Quais canais novos surgiram nos últimos X dias" é critério de sucesso
+        # explícito em docs/01-visao-geral-e-escopo.md.
+        stmt = stmt.where(
+            Channel.discovered_at >= datetime.now(timezone.utc) - timedelta(days=discovered_since_days)
+        )
     if min_growth is not None:
         stmt = stmt.where(growth_7d >= min_growth)
     if signal_types:
