@@ -618,8 +618,6 @@ def main() -> None:
     if not autenticar():
         return
 
-    # Navegação no topo, não na barra lateral: libera a sidebar para os filtros
-    # de cada tela (a Tela 2 já usa) e lê mais como um app moderno.
     paginas = [
         st.Page(tela_visao_geral, title="Visão Geral", icon="📡", default=True),
         st.Page(tela_canais, title="Canais Descobertos", icon="🔎"),
@@ -627,7 +625,14 @@ def main() -> None:
         st.Page(tela_nichos, title="Configuração de Nichos", icon="⚙️"),
         st.Page(tela_alertas, title="Alertas e Relatórios", icon="🔔"),
     ]
-    st.navigation(paginas, position="top").run()
+    # Navegação na barra lateral (posição padrão do st.navigation). A Tela 2
+    # soma seus próprios filtros logo abaixo da lista de páginas.
+    with st.sidebar:
+        st.caption(
+            "🌙 Tema claro/escuro: menu ⋮ no canto superior direito → Settings → "
+            "Choose app theme."
+        )
+    st.navigation(paginas).run()
 
 
 # O Streamlit executa este arquivo como "__main__"; o guarda permite importar o

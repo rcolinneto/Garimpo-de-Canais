@@ -1,13 +1,25 @@
-# Tema do dashboard (paleta "garimpo": navy + âmbar). Cobre os widgets nativos
-# que o CSS em src/dashboard/styles.py não alcança de forma confiável — rádio,
-# checkbox, slider, spinner — porque o Streamlit os desenha internamente e usa
-# a cor "primary" do tema, não classes CSS estáveis.
+# Tema do dashboard (paleta "garimpo": navy + âmbar), em duas variantes.
+# O Streamlit só mostra o seletor de tema no menu (⋮ → Settings) quando há
+# [theme.light] E [theme.dark] definidos — um [theme] único (o que eu tinha
+# antes) é tratado como tema fixo, sem seletor. Confirmado testando as duas
+# formas, não por suposição.
 [theme]
+base = "light"
+font = "sans serif"
+
+[theme.light]
 primaryColor = "#F2A93B"
 backgroundColor = "#FFFFFF"
 secondaryBackgroundColor = "#FAFAFC"
 textColor = "#101828"
-font = "sans serif"
+
+[theme.dark]
+primaryColor = "#F2A93B"
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#16233F"
+textColor = "#F5F6FA"
 
 [client]
-toolbarMode = "minimal"
+# "viewer" mantém o menu (⋮) com Settings (que agora traz o seletor de tema,
+# já que há duas variantes acima) e esconde só as opções de desenvolvedor.
+toolbarMode = "viewer"

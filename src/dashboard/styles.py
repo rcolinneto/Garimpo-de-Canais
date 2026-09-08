@@ -3,25 +3,48 @@
 Um único lugar para a aparência evita que cada tela reinvente cor/espaçamento
 — e mantém a customização em CSS puro (sem libs de UI), consistente com a
 filosofia de simplicidade de `docs/09-requisitos-nao-funcionais.md`.
+
+Claro/escuro: o Streamlit já resolve isso nativamente (menu ⋮ → Settings), e é
+o único jeito correto de fazer isso aqui — as tabelas do dashboard são
+desenhadas em <canvas> pela grid interna dele, e só o motor de tema nativo
+sabe redesenhar esses pixels (CSS não alcança canvas). O que falta ao Streamlit
+fazer sozinho é recolorir os elementos que este módulo desenha por cima (cartões,
+cabeçalhos, landing) — por isso `inject_css` lê `st.context.theme.type`, a API
+oficial para saber qual tema está ativo, e escolhe a paleta correspondente.
 """
 
 import streamlit as st
 
 # Paleta "garimpo": navy escuro (autoridade/dados) + âmbar (achado, ouro).
-_CSS = """
-:root {
+# navy/navy-2/accent/accent-dark/radius são fixas nos dois temas (a marca não
+# muda); o restante se adapta ao claro/escuro.
+_CONSTANTES = """
     --gc-navy: #0B1220;
     --gc-navy-2: #16233F;
-    --gc-ink: #101828;
-    --gc-muted: #5B6472;
     --gc-accent: #F2A93B;
     --gc-accent-dark: #C97F1C;
+    --gc-radius: 14px;
+"""
+
+_CLARO = """
+    --gc-ink: #101828;
+    --gc-muted: #5B6472;
     --gc-accent-soft: #FFF4E0;
+    --gc-accent-text: var(--gc-accent-dark);
     --gc-border: #E7E9EE;
     --gc-card: #FFFFFF;
-    --gc-radius: 14px;
-}
+"""
 
+_ESCURO = """
+    --gc-ink: #F5F6FA;
+    --gc-muted: #A6ADBB;
+    --gc-accent-soft: rgba(242, 169, 59, 0.16);
+    --gc-accent-text: var(--gc-accent);
+    --gc-border: #2A3A5C;
+    --gc-card: #16233F;
+"""
+
+_ESTILO_BASE = """
 /* Tipografia geral: pilha de fontes do sistema, sem depender de CDN externa. */
 html, body, [class*="css"] {
     font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -38,24 +61,31 @@ h1 {
     font-size: 0.95rem !important;
 }
 
-/* --- barra de navegação (st.navigation position="top") ------------------ */
+/* --- barra de navegação (st.navigation, barra lateral) ------------------- */
 [data-testid="stHeader"] {
-    background: #FFFFFF;
+    background: var(--gc-card);
     border-bottom: 1px solid var(--gc-border);
 }
-[data-testid="stTopNavLink"] {
-    border-radius: 999px !important;
+[data-testid="stSidebarNav"] {
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gc-border);
+    margin-bottom: 0.75rem;
+}
+[data-testid="stSidebarNavLink"] {
+    border-radius: 10px !important;
     font-weight: 600 !important;
+    margin: 0.1rem 0;
     transition: background 0.15s ease;
 }
-[data-testid="stTopNavLink"]:hover {
+[data-testid="stSidebarNavLink"]:hover {
     background: var(--gc-accent-soft) !important;
 }
-[data-testid="stTopNavLink"][aria-current="page"] {
+[data-testid="stSidebarNavLink"][aria-current="page"] {
     background: var(--gc-accent-soft) !important;
+    border-left: 3px solid var(--gc-accent);
 }
-[data-testid="stTopNavLink"][aria-current="page"] [data-testid="stMarkdownContainer"] p {
-    color: var(--gc-accent-dark) !important;
+[data-testid="stSidebarNavLink"][aria-current="page"] [data-testid="stMarkdownContainer"] p {
+    color: var(--gc-accent-text) !important;
     font-weight: 700 !important;
 }
 
@@ -97,7 +127,9 @@ button[kind="primaryFormSubmit"] p {
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
 }
 [data-testid="stMetricValue"] {
-    color: var(--gc-navy-2) !important;
+    /* --gc-ink (não --gc-navy-2, que é fixo e vira ilegível sobre o
+       cartão escuro no tema dark, já que os dois usam a mesma cor). */
+    color: var(--gc-ink) !important;
 }
 
 /* --- formulários como cartões (login, cadastro/edição de nicho) --------- */
@@ -123,11 +155,12 @@ button[kind="primaryFormSubmit"] p {
 
 /* --- barra lateral ---------------------------------------------------------- */
 [data-testid="stSidebar"] {
-    background: #FAFAFC;
     border-right: 1px solid var(--gc-border);
 }
 
 /* --- landing (pré-login) --------------------------------------------------- */
+/* O hero é sempre navy escuro com texto claro, nos dois temas — é a marca,
+   não a interface, então não segue a paleta claro/escuro. */
 .gc-hero {
     background: linear-gradient(135deg, var(--gc-navy) 0%, var(--gc-navy-2) 100%);
     border-radius: 24px;
@@ -248,7 +281,7 @@ button[kind="primaryFormSubmit"] p {
     padding: 1.1rem 1.3rem;
     margin-bottom: 2rem;
 }
-.gc-disclaimer strong { color: var(--gc-accent-dark); }
+.gc-disclaimer strong { color: var(--gc-accent-text); }
 .gc-disclaimer p { margin: 0.3rem 0 0 0; color: var(--gc-ink); font-size: 0.94rem; line-height: 1.5; }
 
 .gc-cta-heading {
@@ -260,8 +293,21 @@ button[kind="primaryFormSubmit"] p {
 """
 
 
+def _build_css(dark: bool) -> str:
+    paleta = _ESCURO if dark else _CLARO
+    return f":root {{{_CONSTANTES}{paleta}}}\n{_ESTILO_BASE}"
+
+
 def inject_css() -> None:
-    st.markdown(f"<style>{_CSS}</style>", unsafe_allow_html=True)
+    """Injeta o CSS na paleta certa para o tema ativo no navegador.
+
+    `st.context.theme.type` é a API oficial para ler claro/escuro (inferida do
+    fundo do app). A própria documentação avisa que pode ficar desatualizada
+    por um instante logo após o usuário trocar de tema — é inofensivo aqui:
+    a próxima interação já corrige, e nada quebra visualmente nesse meio-tempo.
+    """
+    escuro = st.context.theme.type == "dark"
+    st.markdown(f"<style>{_build_css(escuro)}</style>", unsafe_allow_html=True)
 
 
 def page_header(icon: str, title: str, subtitle: str | None = None) -> None:
