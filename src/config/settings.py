@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     discovery_cron: str = "0 3 * * *"
     snapshot_cron: str = "0 5 * * *"
+    # Fuso do agendamento: sem isso o container roda em UTC e "3h" vira outro
+    # horário para quem opera o sistema.
+    scheduler_timezone: str = "America/Sao_Paulo"
+    # Se a máquina estiver desligada/suspensa na hora marcada, o job ainda roda
+    # quando o processo voltar dentro desta janela. Sem isso o padrão do
+    # APScheduler é 1 segundo, ou seja: perdeu a hora, perdeu o dia.
+    scheduler_misfire_grace_seconds: int = 21_600
 
     # Orçamento de cota por execução (total diário da chave é 10.000 unidades)
     discovery_quota_budget: int = 3000

@@ -295,30 +295,38 @@ def run_snapshot_job() -> None:
 
 
 def _add_jobs(scheduler) -> None:
-    scheduler.add_job(
-        run_discovery_job,
-        CronTrigger.from_crontab(settings.discovery_cron),
-        id="discovery",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_snapshot_job,
-        CronTrigger.from_crontab(settings.snapshot_cron),
-        id="snapshot",
-        replace_existing=True,
-    )
+    """Registra os dois jobs diários.
+
+    `coalesce` + `misfire_grace_time` existem porque um job diário que perde a
+    hora (máquina suspensa, container reiniciando, deploy) seria simplesmente
+    descartado pelo padrão do APScheduler — e o dia inteiro ficaria sem coleta
+    sem ninguém perceber. Com `coalesce`, várias execuções perdidas viram uma
+    só, para não gastar cota repetida de uma vez.
+    """
+    for job, cron, identificador in (
+        (run_discovery_job, settings.discovery_cron, "discovery"),
+        (run_snapshot_job, settings.snapshot_cron, "snapshot"),
+    ):
+        scheduler.add_job(
+            job,
+            CronTrigger.from_crontab(cron, timezone=settings.scheduler_timezone),
+            id=identificador,
+            replace_existing=True,
+            coalesce=True,
+            misfire_grace_time=settings.scheduler_misfire_grace_seconds,
+        )
 
 
 def build_background_scheduler() -> BackgroundScheduler:
     """Scheduler para rodar dentro do processo da API (docs/07)."""
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=settings.scheduler_timezone)
     _add_jobs(scheduler)
     return scheduler
 
 
 def start_scheduler() -> None:
     """Roda os jobs em primeiro plano (processo dedicado)."""
-    scheduler = BlockingScheduler()
+    scheduler = BlockingScheduler(timezone=settings.scheduler_timezone)
     _add_jobs(scheduler)
     logger.info(
         "Scheduler iniciado — descoberta: '%s', snapshot: '%s'",
