@@ -12,6 +12,7 @@ from streamlit.testing.v1 import AppTest
 
 from src.config.settings import settings
 from src.dashboard import api_client
+from src.dashboard.app import formatar_canais
 
 APP = str(Path(__file__).resolve().parents[1] / "src" / "dashboard" / "app.py")
 SENHA = "senha-de-teste"
@@ -153,6 +154,22 @@ def rodar_tela(nome: str) -> AppTest:
     return app.run()
 
 
+def test_metricas_ausentes_viram_travessao_nao_a_palavra_none():
+    """Achado revisando a screenshot real: canal sem histórico de 7d mostrava
+    a string "None" na tabela em vez de um traço — ilegível para o chefe."""
+    tabela = formatar_canais([CANAL | {"crescimento_7d": None, "crescimento_30d": None}])
+
+    assert tabela.loc[0, "Cresc. 7d (%)"] == "—"
+    assert tabela.loc[0, "Cresc. 30d (%)"] == "—"
+    assert "None" not in tabela.to_string()
+
+
+def test_inscritos_ocultos_mostram_texto_claro():
+    tabela = formatar_canais([CANAL | {"subscriber_count": None}])
+
+    assert tabela.loc[0, "Inscritos"] == "oculto"
+
+
 def test_sem_login_o_dashboard_nao_mostra_dados():
     app = rodar(autenticado=False)
 
@@ -163,19 +180,16 @@ def test_sem_login_o_dashboard_nao_mostra_dados():
 
 
 def test_landing_explica_o_produto_antes_do_login():
+    """A landing é HTML/CSS embutido (não st.title/st.info) — checa o texto bruto."""
     app = rodar(autenticado=False)
 
-    texto = " ".join(
-        [bloco.value for bloco in app.markdown]
-        + [bloco.value for bloco in app.caption]
-        + [bloco.value for bloco in app.title]
-        + [bloco.value for bloco in app.subheader]
-    )
-    assert "Garimpo de Canais" in texto
+    texto = " ".join(bloco.value for bloco in app.markdown)
+    # o wordmark do hero é em caixa alta por design ("GARIMPO DE CANAIS")
+    assert "garimpo" in texto.lower()
     assert "Descobre" in texto and "Detecta monetização" in texto
     # A ressalva de que monetização é estimativa precisa aparecer antes de entrar
-    assert any("estima" in aviso.value for aviso in app.info)
-    assert any(botao.label == "Entrar" for botao in app.button)
+    assert "estima" in texto
+    assert any("Entrar" in botao.label for botao in app.button)
 
 
 def test_landing_nao_vaza_dados_antes_do_login(monkeypatch):

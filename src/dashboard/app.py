@@ -14,6 +14,7 @@ import streamlit as st
 from src.config.settings import settings
 from src.dashboard import api_client
 from src.dashboard.api_client import ApiError
+from src.dashboard.styles import inject_css, page_header
 
 # Taxonomia de docs/05-motor-monetizacao-e-score.md, usada no filtro da Tela 2.
 TIPOS_DE_SINAL = [
@@ -31,54 +32,92 @@ TIPOS_DE_SINAL = [
 
 
 def _apresentacao() -> None:
-    """Explica o que o sistema faz para quem chega sem contexto.
+    """Landing page de apresentação para quem chega sem contexto.
 
     De propósito não mostra nenhum número real: o dashboard fica atrás de senha
-    justamente porque expõe análise de mercado (docs/09), e a tela de entrada é
-    pública para quem alcança a URL.
+    justamente porque expõe análise de mercado (docs/09), e esta tela é pública
+    para quem alcança a URL. É conteúdo estático (HTML/CSS embutido) — não faz
+    nenhuma chamada à API, então não tem como vazar dado nenhum.
     """
-    st.title("📡 Garimpo de Canais")
-    st.subheader("Um radar de canais do YouTube que estão crescendo e já monetizando")
-    st.write(
-        "O sistema procura, sozinho e todos os dias, canais pequenos que estão em "
-        "trajetória de crescimento dentro dos nichos que você configurou — e checa "
-        "quais deles já dão sinais de estar ganhando dinheiro. Serve para enxergar "
-        "que nichos e formatos estão funcionando enquanto ainda há espaço neles."
-    )
-
-    st.divider()
-    st.markdown("#### O que ele faz")
-    colunas = st.columns(4)
-    blocos = [
-        ("🔎", "Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho."),
-        ("📈", "Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo."),
-        ("💰", "Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência de cada achado."),
-        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um score único, para você saber o que olhar primeiro."),
-    ]
-    for coluna, (icone, titulo, texto) in zip(colunas, blocos):
-        coluna.markdown(f"##### {icone} {titulo}")
-        coluna.caption(texto)
-
-    st.divider()
-    st.markdown("#### O que você encontra lá dentro")
     st.markdown(
-        "- **Visão Geral** — quais nichos estão mais aquecidos agora\n"
-        "- **Canais Descobertos** — a tabela de trabalho, com filtros por nicho, tamanho, "
-        "crescimento, sinais de monetização e data de descoberta; exporta para CSV\n"
-        "- **Detalhe do Canal** — evolução de inscritos e views em gráfico, e cada sinal "
-        "de monetização com o link ou trecho que o gerou\n"
-        "- **Configuração de Nichos** — cadastre ou pause nichos sem depender de ninguém\n"
-        "- **Alertas** — avisa por e-mail quando um canal cruza o score que você definir"
+        """
+        <div class="gc-hero">
+          <p class="gc-wordmark">📡 GARIMPO DE CANAIS</p>
+          <span class="gc-badge">🛰️ Coleta automática · YouTube Data API v3</span>
+          <h1>O radar que garimpa canais do <span class="gc-accent-word">YouTube</span>
+              antes de o nicho saturar</h1>
+          <p>Todos os dias, sozinho, o sistema procura canais pequenos que estão crescendo
+             dentro dos nichos que você escolher — e verifica quais já dão sinais de estar
+             sendo monetizados. O resultado é um radar de oportunidades: onde entrar,
+             com qual formato, antes que o assunto vire commodity.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.info(
-        "**Uma ressalva importante:** o sistema **estima** monetização por evidência "
-        "indireta — um link de pagamento na descrição, um e-book anunciado. Ele nunca "
-        "sabe quanto um canal de terceiros realmente fatura, e nenhuma ferramenta do "
-        "mercado sabe. Por isso cada sinal vem com a evidência que o gerou, para você "
-        "conferir antes de decidir qualquer coisa."
+    st.markdown(
+        '<p class="gc-section-title">O que ele faz</p>'
+        '<p class="gc-section-sub">Quatro etapas que rodam sozinhas, todos os dias.</p>',
+        unsafe_allow_html=True,
     )
-    st.divider()
+    blocos = [
+        ("🔎", "Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho — não recadastra quem já estourou."),
+        ("📈", "Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo, não só o número de hoje."),
+        ("💰", "Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência exata de cada achado."),
+        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um único score, para você saber o que vale olhar primeiro."),
+    ]
+    st.markdown(
+        '<div class="gc-grid">'
+        + "".join(
+            f'<div class="gc-card"><span class="gc-icon">{icone}</span>'
+            f"<h4>{titulo}</h4><p>{texto}</p></div>"
+            for icone, titulo, texto in blocos
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<p class="gc-section-title">O que você encontra lá dentro</p>'
+        '<p class="gc-section-sub">Cinco telas, cada uma resolvendo uma pergunta diferente.</p>',
+        unsafe_allow_html=True,
+    )
+    telas = [
+        ("Visão Geral", "Quais nichos estão mais aquecidos agora, com histórico de evolução."),
+        ("Canais Descobertos", "A tabela de trabalho: filtra por nicho, tamanho, crescimento e sinais de monetização; exporta para CSV."),
+        ("Detalhe do Canal", "Gráficos de inscritos, views e score ao longo do tempo, e a evidência de cada sinal encontrado."),
+        ("Configuração de Nichos", "Cadastre ou pause nichos sem depender de ninguém — o histórico já coletado nunca se perde."),
+        ("Alertas", "Avisa por e-mail quando um canal cruza o score que você definir como relevante."),
+    ]
+    st.markdown(
+        '<div class="gc-screens">'
+        + "".join(
+            f'<div class="gc-screen"><div class="gc-screen-title">{nome}</div><p>{texto}</p></div>'
+            for nome, texto in telas
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="gc-disclaimer">
+          <strong>⚠️ Como isso funciona de verdade</strong>
+          <p>O sistema <strong>estima</strong> monetização por evidência indireta — um link
+             de pagamento na descrição, um e-book anunciado. Ele nunca sabe quanto um canal
+             de terceiros realmente fatura, e nenhuma ferramenta do mercado sabe isso. Por
+             isso cada sinal vem com a evidência exata que o gerou, para você conferir antes
+             de decidir qualquer coisa.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="gc-cta-heading"><h3>Pronto para explorar os achados de hoje?</h3>'
+        "<p>Entre com a senha da equipe para abrir o dashboard.</p></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def autenticar() -> bool:
@@ -97,11 +136,10 @@ def autenticar() -> bool:
         )
         return False
 
-    esquerda, _ = st.columns([1, 2])
-    with esquerda.form("login"):
-        st.markdown("##### Acessar o dashboard")
-        senha = st.text_input("Senha", type="password")
-        if st.form_submit_button("Entrar", type="primary", use_container_width=True):
+    _, meio, _ = st.columns([1, 1.2, 1])
+    with meio.form("login"):
+        senha = st.text_input("Senha", type="password", placeholder="Senha da equipe")
+        if st.form_submit_button("Entrar no dashboard →", type="primary", use_container_width=True):
             if hmac.compare_digest(senha, settings.dashboard_password):
                 st.session_state["autenticado"] = True
                 st.rerun()
@@ -130,7 +168,9 @@ def formatar_canais(itens: list[dict]) -> pd.DataFrame:
                 "Canal": item["display_name"],
                 "Link": item["url"],
                 "Nicho": item["niche_name"] or "—",
-                "Inscritos": item["subscriber_count"],
+                "Inscritos": item["subscriber_count"] if item["subscriber_count"] is not None else "oculto",
+                # "—" e não None: sem histórico de 7/30 dias ainda para comparar
+                # (canal recém-descoberto), não é um erro nem um zero.
                 "Cresc. 7d (%)": _arredondar(item["crescimento_7d"]),
                 "Cresc. 30d (%)": _arredondar(item["crescimento_30d"]),
                 "Sinais": ", ".join(item["sinais_monetizacao"]) or "—",
@@ -144,7 +184,8 @@ def formatar_canais(itens: list[dict]) -> pd.DataFrame:
 
 
 def _arredondar(valor, casas: int = 2):
-    return round(valor, casas) if isinstance(valor, (int, float)) else None
+    """Arredonda para exibição; None/valor ausente vira "—", nunca a string "None"."""
+    return round(valor, casas) if isinstance(valor, (int, float)) else "—"
 
 
 def selecionar_canal(itens: list[dict], chave: str) -> int | None:
@@ -163,8 +204,11 @@ def selecionar_canal(itens: list[dict], chave: str) -> int | None:
 
 
 def tela_visao_geral() -> None:
-    st.title("Visão Geral — Radar de Nichos")
-    st.caption("O que está bombando agora, por nicho monitorado.")
+    page_header(
+        "📡",
+        "Visão Geral",
+        "Em 10 segundos: o que está bombando agora, por nicho monitorado.",
+    )
 
     nichos = carregar(api_client.ranking_de_nichos)
     if nichos is None:
@@ -181,6 +225,10 @@ def tela_visao_geral() -> None:
     colunas[2].metric("Novos esta semana", novos)
 
     st.subheader("Nichos por viralidade")
+    st.caption(
+        "Viralidade = crescimento médio dos canais ativos daquele nicho. Um nicho onde "
+        "vários canais crescem ao mesmo tempo é mais interessante que um canal isolado."
+    )
     st.dataframe(
         pd.DataFrame(
             [
@@ -218,24 +266,45 @@ def tela_visao_geral() -> None:
 
 
 def tela_canais() -> None:
-    st.title("Canais Descobertos")
+    page_header(
+        "🔎",
+        "Canais Descobertos",
+        "A tabela de trabalho — refine pelos filtros ao lado e ordene por score.",
+    )
 
     nichos = carregar(api_client.ranking_de_nichos) or []
     opcoes_nicho = {"Todos": None} | {nicho["name"]: nicho["niche_id"] for nicho in nichos}
 
     with st.sidebar:
-        st.header("Filtros")
+        st.header("🔧 Filtros")
+        st.caption("Combine quantos quiser; a lista se atualiza sozinha.")
         nicho = st.selectbox("Nicho", list(opcoes_nicho.keys()))
         min_subs, max_subs = st.columns(2)
         minimo_inscritos = min_subs.number_input("Inscritos (mín.)", min_value=0, value=0, step=100)
         maximo_inscritos = max_subs.number_input("Inscritos (máx.)", min_value=0, value=0, step=1000)
-        crescimento = st.number_input("Crescimento mín. 7d (%)", value=0.0, step=1.0)
-        score_minimo = st.number_input("Score mínimo", min_value=0.0, value=0.0, step=1.0)
-        sinais = st.multiselect("Sinais de monetização", TIPOS_DE_SINAL)
+        crescimento = st.number_input(
+            "Crescimento mín. 7d (%)",
+            value=0.0,
+            step=1.0,
+            help="Variação de inscritos entre o snapshot de hoje e o de 7 dias atrás.",
+        )
+        score_minimo = st.number_input(
+            "Score mínimo",
+            min_value=0.0,
+            value=0.0,
+            step=1.0,
+            help="Combina crescimento, monetização e aquecimento do nicho num só número — quanto maior, mais prioritário.",
+        )
+        sinais = st.multiselect(
+            "Sinais de monetização",
+            TIPOS_DE_SINAL,
+            help="Mostra só canais com pelo menos um destes sinais detectado nos últimos 30 dias.",
+        )
         descobertos_em = st.selectbox(
             "Descobertos nos últimos",
             [None, 7, 15, 30, 90],
             format_func=lambda d: "qualquer data" if d is None else f"{d} dias",
+            help="Filtra pela data em que o canal entrou no sistema, não pela data de criação dele no YouTube.",
         )
         limite = st.slider("Máximo de canais", min_value=10, max_value=200, value=50, step=10)
 
@@ -268,24 +337,30 @@ def tela_canais() -> None:
     )
 
     st.download_button(
-        "Exportar CSV da visão atual",
+        "⬇️ Exportar CSV da visão atual",
         data=tabela.drop(columns=["id"]).to_csv(index=False).encode("utf-8-sig"),
         file_name="canais_garimpados.csv",
         mime="text/csv",
     )
 
-    st.subheader("Abrir detalhe")
+    st.divider()
+    st.subheader("Ver um canal em detalhe")
+    st.caption("Escolha um canal e abra a página 'Detalhe do Canal' no menu acima.")
     escolhido = selecionar_canal(itens, "canal_tela2")
-    if st.button("Selecionar canal"):
+    if st.button("Abrir este canal →", type="primary"):
         st.session_state["canal_selecionado"] = escolhido
-        st.success("Canal selecionado — abra a página 'Detalhe do Canal' no menu ao lado.")
+        st.success("Canal selecionado — abra 'Detalhe do Canal' no menu do topo.")
 
 
 # --- Tela 3 -----------------------------------------------------------------
 
 
 def tela_detalhe() -> None:
-    st.title("Detalhe do Canal")
+    page_header(
+        "📈",
+        "Detalhe do Canal",
+        "Evolução ao longo do tempo e a evidência por trás de cada sinal de monetização.",
+    )
 
     dados = carregar(api_client.listar_canais, limit=200)
     if dados is None:
@@ -301,13 +376,13 @@ def tela_detalhe() -> None:
         return
 
     st.header(canal["display_name"] or canal["youtube_channel_id"])
+    if canal["url"]:
+        st.markdown(f"🔗 [Abrir canal no YouTube]({canal['url']})")
     colunas = st.columns(4)
     colunas[0].metric("Inscritos", canal["subscriber_count"] or "oculto")
     colunas[1].metric("Score total", _arredondar(canal["total_score"]))
     colunas[2].metric("Nicho", canal["niche_name"] or "—")
     colunas[3].metric("Descoberto em", (canal["discovered_at"] or "")[:10])
-    if canal["url"]:
-        st.markdown(f"[Abrir canal no YouTube]({canal['url']})")
 
     historico = carregar(api_client.historico_canal, channel_id)
     if historico:
@@ -326,6 +401,7 @@ def tela_detalhe() -> None:
         if not scores.empty:
             scores["calculated_at"] = pd.to_datetime(scores["calculated_at"])
             st.subheader("Evolução do score e seus componentes")
+            st.caption("total_score = crescimento + monetização + aquecimento do nicho, já com os pesos aplicados.")
             st.line_chart(
                 scores.set_index("calculated_at")[
                     ["total_score", "growth_score", "monetization_score", "niche_virality_score"]
@@ -381,8 +457,11 @@ def tela_detalhe() -> None:
 
 
 def tela_nichos() -> None:
-    st.title("Configuração de Nichos")
-    st.caption("Cadastre, edite ou pause nichos sem precisar mexer em código.")
+    page_header(
+        "⚙️",
+        "Configuração de Nichos",
+        "Cadastre, edite ou pause nichos sem precisar mexer em código ou pedir ajuda técnica.",
+    )
 
     nichos = carregar(api_client.ranking_de_nichos)
     if nichos is None:
@@ -415,8 +494,8 @@ def tela_nichos() -> None:
             "Palavras-chave (uma por linha)",
             help="São elas que alimentam a busca de descoberta na API do YouTube.",
         )
-        ativo = st.checkbox("Ativo", value=True)
-        if st.form_submit_button("Cadastrar"):
+        ativo = st.checkbox("Ativo", value=True, help="Nichos inativos não entram no rodízio de descoberta.")
+        if st.form_submit_button("➕ Cadastrar nicho", type="primary"):
             resultado = carregar(
                 api_client.criar_nicho,
                 name=nome,
@@ -443,7 +522,7 @@ def tela_nichos() -> None:
             value=escolhido["active"],
             help="Desmarcar pausa a descoberta do nicho sem apagar o histórico já coletado.",
         )
-        if st.form_submit_button("Salvar alterações"):
+        if st.form_submit_button("💾 Salvar alterações", type="primary"):
             resultado = carregar(
                 api_client.atualizar_nicho,
                 escolhido["niche_id"],
@@ -460,7 +539,11 @@ def tela_nichos() -> None:
 
 
 def tela_alertas() -> None:
-    st.title("Alertas e Relatórios")
+    page_header(
+        "🔔",
+        "Alertas e Relatórios",
+        "Quem já cruzou o limiar de score, e o histórico de avisos disparados por e-mail.",
+    )
 
     config = carregar(api_client.config_de_alertas)
     if config is None:
@@ -531,9 +614,12 @@ def tela_alertas() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Garimpo de Canais", page_icon="📡", layout="wide")
+    inject_css()
     if not autenticar():
         return
 
+    # Navegação no topo, não na barra lateral: libera a sidebar para os filtros
+    # de cada tela (a Tela 2 já usa) e lê mais como um app moderno.
     paginas = [
         st.Page(tela_visao_geral, title="Visão Geral", icon="📡", default=True),
         st.Page(tela_canais, title="Canais Descobertos", icon="🔎"),
@@ -541,7 +627,7 @@ def main() -> None:
         st.Page(tela_nichos, title="Configuração de Nichos", icon="⚙️"),
         st.Page(tela_alertas, title="Alertas e Relatórios", icon="🔔"),
     ]
-    st.navigation(paginas).run()
+    st.navigation(paginas, position="top").run()
 
 
 # O Streamlit executa este arquivo como "__main__"; o guarda permite importar o

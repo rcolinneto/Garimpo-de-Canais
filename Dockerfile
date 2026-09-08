@@ -8,6 +8,7 @@ RUN apt-get update \
 
 COPY pyproject.toml ./
 COPY src ./src
+COPY .streamlit ./.streamlit
 
 RUN pip install --no-cache-dir .
 

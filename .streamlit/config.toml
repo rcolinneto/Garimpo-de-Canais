@@ -1,0 +1,13 @@
+# Tema do dashboard (paleta "garimpo": navy + âmbar). Cobre os widgets nativos
+# que o CSS em src/dashboard/styles.py não alcança de forma confiável — rádio,
+# checkbox, slider, spinner — porque o Streamlit os desenha internamente e usa
+# a cor "primary" do tema, não classes CSS estáveis.
+[theme]
+primaryColor = "#F2A93B"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FAFAFC"
+textColor = "#101828"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
