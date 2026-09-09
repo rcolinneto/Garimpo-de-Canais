@@ -11,7 +11,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from src.api.main import app, get_session
@@ -330,6 +330,121 @@ def test_historico_de_nicho_inexistente_da_404(api):
     client, _ = api
 
     assert client.get("/nichos/999999/historico").status_code == 404
+
+
+# --- POST /nichos/{id}/buscar-agora ------------------------------------------
+#
+# O endpoint grava o log de execução em uma SessionLocal() própria (de
+# propósito — mesmo padrão de src/scheduler/jobs.py, para o log sobreviver
+# mesmo se a sessão principal for revertida). Isso significa que esse log
+# ESCAPA da transação com rollback da fixture `api` e vai parar de verdade no
+# Postgres — por isso os testes abaixo limpam esse rastro no final.
+
+
+def _limpar_logs_de_busca_manual(desde):
+    engine = create_engine(DATABASE_URL)
+    with engine.connect() as conn:
+        conn.execute(
+            text("DELETE FROM collection_runs WHERE job_type = 'discovery_manual' AND started_at >= :desde"),
+            {"desde": desde},
+        )
+        conn.commit()
+
+
+def test_buscar_agora_registra_canais_novos(api, monkeypatch):
+    client, ids = api
+    import src.api.main as api_main
+
+    class FalsoCollector:
+        def __init__(self, quota_budget=None):
+            self.units_consumed = 42
+
+    def descoberta_falsa(session, collector, niche):
+        canal = Channel(
+            youtube_channel_id="UC_busca_agora",
+            display_name="Canal Achado Agora",
+            niche_id=niche.id,
+            status="active",
+        )
+        session.add(canal)
+        session.flush()
+        return [canal], False
+
+    monkeypatch.setattr(api_main, "YouTubeCollector", FalsoCollector)
+    monkeypatch.setattr(api_main, "discover_niche_now", descoberta_falsa)
+
+    inicio = AGORA
+    resposta = client.post(f"/nichos/{ids['nicho_financas']}/buscar-agora")
+
+    try:
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo["status"] == "success"
+        assert corpo["canais_novos"] == 1
+        assert corpo["novos_canais"] == ["Canal Achado Agora"]
+        assert corpo["api_units_consumed"] == 42
+    finally:
+        _limpar_logs_de_busca_manual(inicio)
+
+
+def test_buscar_agora_reporta_parcial_quando_cota_estoura(api, monkeypatch):
+    client, ids = api
+    import src.api.main as api_main
+
+    class FalsoCollector:
+        def __init__(self, quota_budget=None):
+            self.units_consumed = 100
+
+    def descoberta_parcial(session, collector, niche):
+        canal = Channel(
+            youtube_channel_id="UC_parcial", display_name="Canal Parcial", niche_id=niche.id, status="active"
+        )
+        session.add(canal)
+        session.flush()
+        return [canal], True  # cota_esgotada=True
+
+    monkeypatch.setattr(api_main, "YouTubeCollector", FalsoCollector)
+    monkeypatch.setattr(api_main, "discover_niche_now", descoberta_parcial)
+
+    inicio = AGORA
+    resposta = client.post(f"/nichos/{ids['nicho_financas']}/buscar-agora")
+
+    try:
+        corpo = resposta.json()
+        assert corpo["status"] == "partial"
+        # O que já tinha sido achado antes de a cota estourar não se perde.
+        assert corpo["canais_novos"] == 1
+        assert "cota" in corpo["error_message"].lower()
+    finally:
+        _limpar_logs_de_busca_manual(inicio)
+
+
+def test_buscar_agora_sem_chave_de_api_vira_falha_controlada(api, monkeypatch):
+    client, ids = api
+    import src.api.main as api_main
+
+    def sem_chave(*args, **kwargs):
+        raise ValueError("Nenhuma chave da YouTube Data API configurada")
+
+    monkeypatch.setattr(api_main, "YouTubeCollector", sem_chave)
+
+    inicio = AGORA
+    resposta = client.post(f"/nichos/{ids['nicho_financas']}/buscar-agora")
+
+    try:
+        assert resposta.status_code == 200
+        corpo = resposta.json()
+        assert corpo["status"] == "failed"
+        assert corpo["canais_novos"] == 0
+        assert "chave" in corpo["error_message"].lower()
+    finally:
+        _limpar_logs_de_busca_manual(inicio)
+
+
+def test_buscar_agora_nicho_inexistente_da_404(api):
+    client, _ = api
+
+    assert client.post("/nichos/999999/buscar-agora").status_code == 404
 
 
 def test_lista_alertas_enviados(api):

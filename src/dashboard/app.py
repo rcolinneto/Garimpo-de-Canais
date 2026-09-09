@@ -275,6 +275,49 @@ def tela_canais() -> None:
     nichos = carregar(api_client.ranking_de_nichos) or []
     opcoes_nicho = {"Todos": None} | {nicho["name"]: nicho["niche_id"] for nicho in nichos}
 
+    with st.expander("🛰️ Buscar novos canais agora no YouTube"):
+        st.caption(
+            "Dispara uma busca de verdade na API do YouTube para o nicho escolhido, sem "
+            "esperar o job agendado (roda sozinho às 3h e 5h). Consome cota real da API — "
+            "cerca de 100 unidades de busca mais ~3 por candidato analisado — e pode levar "
+            "de dezenas de segundos a um par de minutos."
+        )
+        nichos_ativos = {nicho["name"]: nicho["niche_id"] for nicho in nichos if nicho["active"]}
+        if not nichos_ativos:
+            st.info(
+                "Nenhum nicho ativo cadastrado ainda. Cadastre um na tela "
+                "'Configuração de Nichos' para poder buscar."
+            )
+        else:
+            nicho_busca = st.selectbox(
+                "Nicho", list(nichos_ativos.keys()), key="nicho_busca_agora"
+            )
+            if st.button("🔎 Buscar agora", type="primary"):
+                with st.spinner(f"Buscando '{nicho_busca}' no YouTube — pode demorar um pouco..."):
+                    resultado = carregar(
+                        api_client.buscar_nicho_agora, nichos_ativos[nicho_busca]
+                    )
+                if resultado is not None:
+                    if resultado["status"] == "failed":
+                        st.error(f"A busca falhou: {resultado['error_message']}")
+                    elif resultado["canais_novos"] == 0:
+                        st.info(
+                            f"Busca concluída ({resultado['api_units_consumed']} unidades de "
+                            "cota) — nenhum canal novo encontrado desta vez."
+                        )
+                    else:
+                        st.success(
+                            f"{resultado['canais_novos']} canal(is) novo(s) — "
+                            f"{', '.join(resultado['novos_canais'])} "
+                            f"({resultado['api_units_consumed']} unidades de cota). Já aparecem "
+                            "na tabela abaixo."
+                        )
+                    if resultado is not None and resultado["status"] == "partial":
+                        st.warning(
+                            "A cota do dia estourou no meio da busca — o que já tinha sido "
+                            "encontrado até então foi salvo."
+                        )
+
     with st.sidebar:
         st.header("🔧 Filtros")
         st.caption("Combine quantos quiser; a lista se atualiza sozinha.")

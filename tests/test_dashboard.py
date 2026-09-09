@@ -135,6 +135,19 @@ def api_falsa(monkeypatch):
             }
         ],
     )
+    monkeypatch.setattr(
+        api_client,
+        "buscar_nicho_agora",
+        lambda niche_id: {
+            "niche_id": niche_id,
+            "niche_name": "finanças pessoais",
+            "status": "success",
+            "canais_novos": 2,
+            "api_units_consumed": 137,
+            "novos_canais": ["Canal Novo A", "Canal Novo B"],
+            "error_message": None,
+        },
+    )
 
 
 def rodar(autenticado: bool = True) -> AppTest:
@@ -273,6 +286,62 @@ def test_tela_canais_oferece_exportacao_csv():
     app = rodar_tela("tela_canais")
 
     assert any("CSV" in botao.label for botao in app.get("download_button"))
+
+
+def test_tela_canais_tem_secao_de_busca_sob_demanda():
+    app = rodar_tela("tela_canais")
+
+    assert any("Buscar" in expander.label for expander in app.expander)
+    assert any("finanças pessoais" in caixa.options for caixa in app.selectbox)
+    assert any("Buscar agora" in botao.label for botao in app.button)
+
+
+def test_botao_buscar_agora_chama_a_api_e_mostra_resultado(monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(
+        api_client,
+        "buscar_nicho_agora",
+        lambda niche_id: chamadas.append(niche_id)
+        or {
+            "niche_id": niche_id,
+            "niche_name": "finanças pessoais",
+            "status": "success",
+            "canais_novos": 2,
+            "api_units_consumed": 137,
+            "novos_canais": ["Canal Novo A", "Canal Novo B"],
+            "error_message": None,
+        },
+    )
+
+    app = rodar_tela("tela_canais")
+    botao = next(b for b in app.button if "Buscar agora" in b.label)
+    app = botao.click().run()
+
+    # A busca foi disparada pela API, nunca direto no banco (docs/02).
+    assert chamadas == [NICHO["niche_id"]]
+    assert any("Canal Novo A" in sucesso.value for sucesso in app.success)
+
+
+def test_botao_buscar_agora_mostra_aviso_quando_cota_estoura(monkeypatch):
+    monkeypatch.setattr(
+        api_client,
+        "buscar_nicho_agora",
+        lambda niche_id: {
+            "niche_id": niche_id,
+            "niche_name": "finanças pessoais",
+            "status": "partial",
+            "canais_novos": 1,
+            "api_units_consumed": 3000,
+            "novos_canais": ["Canal Parcial"],
+            "error_message": "cota estourada",
+        },
+    )
+
+    app = rodar_tela("tela_canais")
+    botao = next(b for b in app.button if "Buscar agora" in b.label)
+    app = botao.click().run()
+
+    assert any("cota" in aviso.value.lower() for aviso in app.warning)
 
 
 def test_tela_detalhe_mostra_evidencia_do_sinal():

@@ -117,6 +117,18 @@ class AlertaConfig(BaseModel):
     destinatarios: list[str]
 
 
+class BuscaAgoraResposta(BaseModel):
+    """Resultado de uma busca sob demanda (docs/04 — search.list custa cota real)."""
+
+    niche_id: int
+    niche_name: str
+    status: str  # success | partial (cota estourou no meio) | failed
+    canais_novos: int
+    api_units_consumed: int
+    novos_canais: list[str] = Field(default_factory=list)
+    error_message: str | None = None
+
+
 class NichoCreate(BaseModel):
     """Payload da Tela 4 ao cadastrar um nicho."""
 

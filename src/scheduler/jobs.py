@@ -18,7 +18,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy import func, select
 
 from src.collectors.models import ChannelRef
-from src.collectors.youtube import QuotaExceededError, YouTubeCollector, is_relevant_candidate
+from src.collectors.youtube import QuotaExceededError, YouTubeCollector
 from src.config.logging import configure_logging
 from src.config.settings import settings
 from src.db.models import Channel, ChannelSnapshot, CollectionRun, MonetizationSignal, Niche
@@ -26,6 +26,7 @@ from src.db.session import SessionLocal
 from src.enrichment.monetization import dedupe_key, detect_signals
 from src.enrichment.scoring import run_enrichment
 from src.scheduler.alerts import alertar_falha_de_job, run_alerts_job
+from src.scheduler.discovery import discover_niche_now, register_candidates, snapshot_row
 
 logger = logging.getLogger(__name__)
 
@@ -62,21 +63,6 @@ def _persist_run(
     # por cota é comportamento previsto, não falha.
     if status == "failed":
         alertar_falha_de_job(job_type, error_message)
-
-
-def _snapshot_row(channel_id: int, snapshot) -> ChannelSnapshot:
-    payload = dict(snapshot.raw_payload)
-    payload["max_recent_video_views"] = snapshot.max_recent_video_views
-    return ChannelSnapshot(
-        channel_id=channel_id,
-        collected_at=snapshot.collected_at,
-        subscriber_count=snapshot.subscriber_count,
-        total_view_count=snapshot.total_view_count,
-        video_count=snapshot.video_count,
-        avg_views_last_n_videos=snapshot.avg_views_last_n_videos,
-        engagement_rate=snapshot.engagement_rate,
-        raw_payload=payload,
-    )
 
 
 def _persist_monetization_signals(
@@ -120,37 +106,6 @@ def _persist_monetization_signals(
     return novos
 
 
-def _register_candidates(session, collector: YouTubeCollector, refs, niche_id: int | None) -> int:
-    """Cadastra os candidatos que passarem no filtro de relevância. Devolve quantos entraram."""
-    registered = 0
-    for ref in refs:
-        already_known = (
-            session.query(Channel).filter_by(youtube_channel_id=ref.youtube_channel_id).first()
-        )
-        if already_known:
-            continue
-
-        snapshot = collector.fetch_snapshot(ref)
-        if snapshot is None or not is_relevant_candidate(snapshot):
-            continue
-
-        channel = Channel(
-            youtube_channel_id=ref.youtube_channel_id,
-            handle=snapshot.channel_ref.handle,
-            display_name=snapshot.channel_ref.display_name or ref.display_name,
-            url=snapshot.channel_ref.url or ref.url,
-            niche_id=niche_id,
-            first_seen_subscriber_count=snapshot.subscriber_count,
-            status="active",
-        )
-        session.add(channel)
-        session.flush()
-        session.add(_snapshot_row(channel.id, snapshot))
-        registered += 1
-        logger.info("Canal descoberto: %s (%s)", channel.display_name, channel.youtube_channel_id)
-    return registered
-
-
 def run_discovery_job() -> None:
     """Descobre canais novos: rodízio de nichos via search.list + vídeos em alta."""
     started_at = datetime.now(timezone.utc)
@@ -172,14 +127,16 @@ def run_discovery_job() -> None:
                 .all()
             )
             for niche in niches:
-                refs = collector.discover_candidates(list(niche.keywords or []))
-                processed += _register_candidates(session, collector, refs, niche.id)
-                niche.last_discovery_at = datetime.now(timezone.utc)
+                novos, cota_esgotada = discover_niche_now(session, collector, niche)
+                processed += len(novos)
                 # Commit por nicho: se a cota acabar no meio, o que já foi descoberto fica.
                 session.commit()
+                if cota_esgotada:
+                    raise QuotaExceededError(f"Cota esgotada durante o nicho '{niche.name}'")
 
             trending_refs = collector.discover_trending_candidates()
-            processed += _register_candidates(session, collector, trending_refs, None)
+            trending_novos, _ = register_candidates(session, collector, trending_refs, None)
+            processed += len(trending_novos)
             session.commit()
     except QuotaExceededError as error:
         status = "partial"
@@ -249,7 +206,7 @@ def run_snapshot_job() -> None:
                         channel.status = "removed"
                         logger.info("Canal removido do YouTube: %s", channel.youtube_channel_id)
                     else:
-                        session.add(_snapshot_row(channel.id, snapshot))
+                        session.add(snapshot_row(channel.id, snapshot))
                         channel.display_name = (
                             snapshot.channel_ref.display_name or channel.display_name
                         )

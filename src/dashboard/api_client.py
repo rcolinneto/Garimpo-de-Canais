@@ -12,6 +12,9 @@ import requests
 from src.config.settings import settings
 
 TIMEOUT_SEGUNDOS = 30
+# A busca sob demanda é síncrona e chama a API do YouTube na hora — pode levar
+# bem mais que o timeout padrão para um nicho com muitos candidatos.
+TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
 
 
 class ApiError(RuntimeError):
@@ -38,9 +41,9 @@ def _tratar(resposta: requests.Response) -> Any:
     return resposta.json()
 
 
-def _requisitar(metodo: str, path: str, **kwargs) -> Any:
+def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwargs) -> Any:
     try:
-        resposta = requests.request(metodo, _url(path), timeout=TIMEOUT_SEGUNDOS, **kwargs)
+        resposta = requests.request(metodo, _url(path), timeout=timeout, **kwargs)
     except requests.RequestException as erro:
         raise ApiError(f"Não foi possível falar com a API ({settings.api_base_url}): {erro}") from erro
     return _tratar(resposta)
@@ -75,6 +78,13 @@ def criar_nicho(name: str, keywords: list[str], active: bool = True) -> dict:
 
 def atualizar_nicho(niche_id: int, **campos) -> dict:
     return _requisitar("PUT", f"/nichos/{niche_id}", json=campos)
+
+
+def buscar_nicho_agora(niche_id: int) -> dict:
+    """Dispara uma busca real no YouTube para o nicho, na hora — consome cota."""
+    return _requisitar(
+        "POST", f"/nichos/{niche_id}/buscar-agora", timeout=TIMEOUT_BUSCA_AGORA_SEGUNDOS
+    )
 
 
 def listar_alertas(limit: int = 100) -> list[dict]:

@@ -1,5 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy import func
@@ -8,6 +9,7 @@ from src.api import queries
 from src.api.schemas import (
     AlertaConfig,
     AlertaEnviado,
+    BuscaAgoraResposta,
     CanalDetalhe,
     CanalItem,
     HistoricoCanal,
@@ -22,11 +24,13 @@ from src.api.schemas import (
     SnapshotPonto,
     VideoRecente,
 )
+from src.collectors.youtube import QuotaExceededError, YouTubeCollector
 from src.config.logging import configure_logging
 from src.config.settings import settings
-from src.db.models import Channel, Niche
+from src.db.models import Channel, CollectionRun, Niche
 from src.db.session import SessionLocal
 from src.scheduler.alerts import destinatarios, smtp_configurado
+from src.scheduler.discovery import discover_niche_now
 from src.scheduler.jobs import build_background_scheduler
 
 configure_logging()
@@ -241,6 +245,81 @@ def ranking_de_nichos(
         )
         for row in queries.niches_ranking(session, only_active=only_active)
     ]
+
+
+@app.post("/nichos/{niche_id}/buscar-agora", response_model=BuscaAgoraResposta)
+def buscar_nicho_agora(niche_id: int, session=Depends(get_session)) -> BuscaAgoraResposta:
+    """Tela 2 — dispara agora uma busca real no YouTube para um nicho, sem
+    esperar o job agendado (3h/5h).
+
+    Síncrono e pode levar de dezenas de segundos a um par de minutos: é uma
+    chamada `search.list` (100 unidades) mais a checagem de relevância de cada
+    candidato (`channels.list`/`playlistItems.list`/`videos.list`, 3 unidades
+    por candidato) — a mesma regra de `docs/04-coleta-youtube.md`, só que fora
+    do horário agendado. Usa o mesmo teto de cota do job de descoberta, para um
+    clique não conseguir estourar a cota do dia sozinho.
+    """
+    nicho = session.get(Niche, niche_id)
+    if nicho is None:
+        raise HTTPException(status_code=404, detail="Nicho não encontrado")
+
+    started_at = datetime.now(timezone.utc)
+    status_execucao = "success"
+    error_message = None
+    novos: list[Channel] = []
+    collector: YouTubeCollector | None = None
+    try:
+        collector = YouTubeCollector(quota_budget=settings.discovery_quota_budget)
+        novos, cota_esgotada = discover_niche_now(session, collector, nicho)
+        session.commit()
+        if cota_esgotada:
+            status_execucao = "partial"
+            error_message = "A cota do dia estourou no meio da busca; o que já foi encontrado foi salvo."
+    except QuotaExceededError as error:
+        status_execucao = "partial"
+        error_message = str(error)
+        # Preserva o que já foi descoberto antes de a cota estourar.
+        session.commit()
+    except Exception as error:  # noqa: BLE001
+        status_execucao = "failed"
+        error_message = str(error)
+        # Sem commit explícito: o que ficou pendente desta tentativa é
+        # descartado quando a sessão da requisição fechar (get_session), sem
+        # precisar de rollback manual aqui — que arriscaria descartar
+        # trabalho pendente de fora desta função também.
+        logger.exception("Falha na busca sob demanda do nicho %s", niche_id)
+
+    units = collector.units_consumed if collector else 0
+    with SessionLocal() as log_session:
+        log_session.add(
+            CollectionRun(
+                job_type="discovery_manual",
+                started_at=started_at,
+                finished_at=datetime.now(timezone.utc),
+                status=status_execucao,
+                items_processed=len(novos),
+                error_message=error_message,
+                api_units_consumed=units,
+            )
+        )
+        log_session.commit()
+
+    logger.info(
+        "Busca sob demanda do nicho '%s' (%s): %d canais novos, %d unidades",
+        nicho.name,
+        status_execucao,
+        len(novos),
+        units,
+    )
+    return BuscaAgoraResposta(
+        niche_id=nicho.id,
+        niche_name=nicho.name,
+        status=status_execucao,
+        canais_novos=len(novos),
+        api_units_consumed=units,
+        novos_canais=[canal.display_name or canal.youtube_channel_id for canal in novos],
+        error_message=error_message,
+    )
 
 
 @app.get("/alertas", response_model=list[AlertaEnviado])
