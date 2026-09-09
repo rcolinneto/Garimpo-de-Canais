@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # Score a partir do qual um canal vira alerta
     alert_score_threshold: float = 50.0
 
+    # Segredo compartilhado para disparar /cron/discovery e /cron/snapshot de
+    # fora (ex.: GitHub Actions), usado quando não há como manter um processo
+    # de agendamento sempre ligado (docs/07 — deploy gratuito em Render).
+    cron_secret: str = ""
+
     # Agendamento dos jobs (cron de 5 campos)
     scheduler_enabled: bool = True
     discovery_cron: str = "0 3 * * *"

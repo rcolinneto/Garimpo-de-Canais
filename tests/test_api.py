@@ -14,7 +14,9 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
+import src.api.main as api_main
 from src.api.main import app, get_session
+from src.config.settings import settings
 from src.db.models import (
     AlertSent,
     Channel,
@@ -445,6 +447,64 @@ def test_buscar_agora_nicho_inexistente_da_404(api):
     client, _ = api
 
     assert client.post("/nichos/999999/buscar-agora").status_code == 404
+
+
+# --- POST /cron/discovery, /cron/snapshot ------------------------------------
+#
+# Endpoints para deploys sem processo próprio de agendamento (docs/07 —
+# Render + GitHub Actions). Fecham por padrão: sem CRON_SECRET configurado,
+# nada dispara, nem com um segredo qualquer no header.
+
+
+def test_cron_sem_secret_configurado_da_401(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "cron_secret", "")
+
+    resposta = client.post("/cron/discovery", headers={"X-Cron-Secret": "qualquer-coisa"})
+
+    assert resposta.status_code == 401
+
+
+def test_cron_com_secret_errado_da_401(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "cron_secret", "segredo-certo")
+
+    resposta = client.post("/cron/discovery", headers={"X-Cron-Secret": "segredo-errado"})
+
+    assert resposta.status_code == 401
+
+
+def test_cron_sem_header_da_401(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "cron_secret", "segredo-certo")
+
+    assert client.post("/cron/discovery").status_code == 401
+
+
+def test_cron_discovery_com_secret_correto_dispara_o_job(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "cron_secret", "segredo-certo")
+    chamadas = []
+    monkeypatch.setattr(api_main, "run_discovery_job", lambda: chamadas.append("discovery"))
+
+    resposta = client.post("/cron/discovery", headers={"X-Cron-Secret": "segredo-certo"})
+
+    assert resposta.status_code == 202
+    # BackgroundTasks do Starlette roda de forma síncrona sob o TestClient,
+    # então já dá para confirmar a chamada sem esperar nada.
+    assert chamadas == ["discovery"]
+
+
+def test_cron_snapshot_com_secret_correto_dispara_o_job(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "cron_secret", "segredo-certo")
+    chamadas = []
+    monkeypatch.setattr(api_main, "run_snapshot_job", lambda: chamadas.append("snapshot"))
+
+    resposta = client.post("/cron/snapshot", headers={"X-Cron-Secret": "segredo-certo"})
+
+    assert resposta.status_code == 202
+    assert chamadas == ["snapshot"]
 
 
 def test_lista_alertas_enviados(api):

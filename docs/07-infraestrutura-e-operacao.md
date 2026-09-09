@@ -6,6 +6,22 @@
 - Não há necessidade de infraestrutura elaborada (Kubernetes, múltiplas regiões, etc.) para o volume esperado — isso seria over-engineering para um sistema de uso interno de uma pessoa/pequeno time.
 - `.env` com as credenciais (chave da API do YouTube, credenciais do banco, credenciais de SMTP para alertas) — nunca commitado no repositório; `.env.example` documenta quais variáveis existem.
 
+### Alternativa de deploy gratuita, sem cartão de crédito
+
+Registrado aqui porque foi uma decisão real do projeto, não hipotética: avaliamos hospedar em Vercel e descartamos por dois motivos — tecnicamente incompatível (Streamlit exige processo persistente com WebSocket, que serverless não oferece; o job de snapshot pode levar minutos, acima do limite de execução de uma function) e os termos do plano gratuito (Hobby) da Vercel restringem a uso pessoal não-comercial, o que este projeto não é.
+
+A combinação que não exige cartão em lugar nenhum:
+
+| Peça | Onde | Por quê |
+|---|---|---|
+| `app` + `dashboard` | **Render** (free tier) | Sobe direto do `Dockerfile`, sem adaptar código — Streamlit continua sendo um serviço web normal, não precisa ser serverless. |
+| Banco | **Neon** (free tier) | Postgres comum (só troca `DATABASE_URL`); plano gratuito permanente, não expira por inatividade. |
+| Agendamento | **GitHub Actions** (`.github/workflows/cron.yml`) | O free tier do Render "dorme" sem tráfego — um scheduler dentro do processo (APScheduler) não dispararia à noite. Um workflow agendado do GitHub chama `POST /cron/discovery` e `POST /cron/snapshot` de fora, o que também acorda o serviço. |
+
+Para esse caminho: `SCHEDULER_ENABLED=false` (desliga o APScheduler interno, redundante aqui) e `CRON_SECRET` configurado — os dois endpoints `/cron/*` recusam qualquer chamada sem o segredo certo (fecham por padrão, mesma lógica do `DASHBOARD_PASSWORD`). Os secrets `RENDER_API_URL` e `CRON_SECRET` do workflow ficam em Settings → Secrets and variables → Actions do repositório.
+
+Esses endpoints devolvem `202` na hora e rodam o job em segundo plano — não dependem de a plataforma tolerar uma requisição de vários minutos. Se a chamada for interrompida ou a cota estourar no meio, o que já foi commitado por nicho continua salvo (`src/scheduler/discovery.py`).
+
 ## Agendamento
 
 - APScheduler rodando dentro do próprio processo da aplicação, com os jobs de descoberta (ex.: 1x/dia) e snapshot (ex.: 1x/dia) configurados por cron expression em `config/settings.py`.

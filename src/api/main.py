@@ -1,8 +1,9 @@
+import hmac
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
 from sqlalchemy import func
 
 from src.api import queries
@@ -31,7 +32,7 @@ from src.db.models import Channel, CollectionRun, Niche
 from src.db.session import SessionLocal
 from src.scheduler.alerts import destinatarios, smtp_configurado
 from src.scheduler.discovery import discover_niche_now
-from src.scheduler.jobs import build_background_scheduler
+from src.scheduler.jobs import build_background_scheduler, run_discovery_job, run_snapshot_job
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -71,6 +72,45 @@ app = FastAPI(title="Garimpo de Canais", version="0.1.0", lifespan=lifespan)
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+def _verificar_cron_secret(recebido: str | None) -> None:
+    """Protege /cron/* — endpoints pensados para serem chamados de fora (ex.:
+    GitHub Actions) num deploy sem processo próprio de agendamento (docs/07).
+
+    Fecha por padrão: sem CRON_SECRET configurado, ninguém dispara nada —
+    mesma lógica de "falha fechada" do DASHBOARD_PASSWORD.
+    """
+    if not settings.cron_secret or not recebido or not hmac.compare_digest(recebido, settings.cron_secret):
+        raise HTTPException(status_code=401, detail="Segredo de cron ausente ou inválido")
+
+
+@app.post("/cron/discovery", status_code=202)
+def cron_discovery(
+    background_tasks: BackgroundTasks,
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+) -> dict[str, str]:
+    """Dispara o job de descoberta em segundo plano.
+
+    Devolve 202 na hora, sem esperar o job terminar — evita depender de a
+    plataforma de hospedagem tolerar uma requisição longa (o job pode levar
+    minutos). Se a cota estourar ou a chamada for interrompida no meio, o que
+    já foi commitado por nicho continua salvo (ver src/scheduler/discovery.py).
+    """
+    _verificar_cron_secret(x_cron_secret)
+    background_tasks.add_task(run_discovery_job)
+    return {"status": "accepted"}
+
+
+@app.post("/cron/snapshot", status_code=202)
+def cron_snapshot(
+    background_tasks: BackgroundTasks,
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+) -> dict[str, str]:
+    """Dispara o job de snapshot (+ enriquecimento e alertas) em segundo plano."""
+    _verificar_cron_secret(x_cron_secret)
+    background_tasks.add_task(run_snapshot_job)
+    return {"status": "accepted"}
 
 
 def _videos_do_payload(raw_payload: dict | None) -> list[VideoRecente]:

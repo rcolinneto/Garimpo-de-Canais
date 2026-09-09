@@ -1,0 +1,45 @@
+name: Coleta agendada (deploy sem processo de agendamento próprio)
+
+# Substitui o APScheduler interno quando o app roda numa plataforma que
+# "dorme" sem tráfego (ex.: Render free tier) — nesse caso um scheduler
+# dentro do próprio processo não dispara à noite. Ver docs/07 (seção
+# "Alternativa de deploy gratuita, sem cartão").
+#
+# Requer dois secrets do repositório (Settings > Secrets and variables >
+# Actions): RENDER_API_URL (ex.: https://garimpo-api.onrender.com) e
+# CRON_SECRET (o mesmo valor configurado como CRON_SECRET no Render).
+
+on:
+  schedule:
+    # Horários equivalentes a 3h e 5h em America/Sao_Paulo (UTC-3 fixo, sem
+    # horário de verão no Brasil desde 2019).
+    - cron: "0 6 * * *" # descoberta
+    - cron: "0 8 * * *" # snapshot
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Job para disparar manualmente"
+        required: true
+        type: choice
+        options: [discovery, snapshot]
+
+jobs:
+  disparar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determinar qual job disparar
+        id: escolher
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "endpoint=${{ inputs.job }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 6 * * *" ]; then
+            echo "endpoint=discovery" >> "$GITHUB_OUTPUT"
+          else
+            echo "endpoint=snapshot" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Chamar a API (só dispara — a resposta 202 volta na hora)
+        run: |
+          curl -fsS --max-time 30 -X POST \
+            "${{ secrets.RENDER_API_URL }}/cron/${{ steps.escolher.outputs.endpoint }}" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
