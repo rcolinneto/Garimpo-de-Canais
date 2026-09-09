@@ -1,0 +1,33 @@
+name: Manter o dashboard sempre acordado (Render free tier)
+
+# O Render free tier "dorme" o serviço depois de 15 min sem tráfego. Quando
+# alguém abre uma aba que ficou parada durante esse sono, o WebSocket do
+# Streamlit tenta reconectar bem no instante em que o serviço está subindo de
+# novo, e às vezes essa reconexão cai numa resposta 502 (a página de erro
+# padrão do Render) que aparece crua dentro da tela, em vez de um "carregando"
+# decente.
+#
+# Corrigido com um ping a cada 10 minutos — bem abaixo do limiar de 15 min de
+# inatividade, então o serviço nunca chega a dormir.
+#
+# Só o `dashboard` recebe esse ping, de propósito: o Render dá 750 horas
+# grátis por WORKSPACE (não por serviço). Manter os dois serviços sempre
+# acordados passaria de 1.460h/mês combinadas, estourando o limite grátis.
+# O `app` (API) continua dormindo normalmente quando ocioso — se o dashboard
+# chamar a API dormindo, o próprio código já trata isso com uma mensagem de
+# erro amigável (api_client.py), não com uma página quebrada.
+#
+# Requer o secret RENDER_DASHBOARD_URL (Settings > Secrets and variables >
+# Actions) com a URL pública do serviço `dashboard` no Render.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pingar o dashboard
+        run: curl -fsS --max-time 20 -o /dev/null "${{ secrets.RENDER_DASHBOARD_URL }}"
