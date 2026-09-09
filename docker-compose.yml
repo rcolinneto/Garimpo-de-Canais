@@ -19,16 +19,16 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # env_file carrega TODAS as variáveis documentadas em .env.example (cron,
+    # pesos do score, filtros de descoberta etc.) — sem isso, só as poucas
+    # listadas explicitamente chegavam ao container, e o resto ficava mudo
+    # mesmo que alguém editasse o .env.
+    env_file:
+      - .env
     environment:
+      # Sobrescreve o que vem do .env: dentro da rede do compose o banco é
+      # "db", não "localhost".
       DATABASE_URL: postgresql://${POSTGRES_USER:-garimpo}:${POSTGRES_PASSWORD:-garimpo}@db:5432/${POSTGRES_DB:-garimpo}
-      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
-      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
     ports:
       - "${APP_HOST_PORT:-8010}:8000"
     depends_on:
@@ -44,10 +44,11 @@ services:
       - src/dashboard/app.py
       - --server.port=8501
       - --server.address=0.0.0.0
+    env_file:
+      - .env
     environment:
       # Consome a API pela rede interna do compose, nunca o banco direto.
       API_BASE_URL: http://app:8000
-      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-}
     ports:
       - "${DASHBOARD_HOST_PORT:-8501}:8501"
     depends_on:
