@@ -159,14 +159,48 @@ button[kind="primaryFormSubmit"] p {
 }
 
 /* --- landing (pré-login) --------------------------------------------------- */
-/* O hero é sempre navy escuro com texto claro, nos dois temas — é a marca,
-   não a interface, então não segue a paleta claro/escuro. */
+/* Sempre escura, nos dois temas — é a marca (inspirada em fitagenda-amber.
+   vercel.app), não a interface de trabalho, então não segue claro/escuro.
+   Paleta fixa própria (--gc-land-*) em vez de --gc-ink/--gc-card, que mudam
+   com o tema — essas classes só existem aqui, nunca no app autenticado. */
+:root {
+    --gc-land-bg: #0A090C;
+    --gc-land-card: #17161C;
+    --gc-land-border: rgba(255, 255, 255, 0.09);
+    --gc-land-text: #F5F4F2;
+    --gc-land-muted: #9C9BA3;
+}
+
+.gc-landing-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0 1.75rem 0;
+}
+.gc-landing-nav .gc-wordmark { margin: 0; }
+.gc-landing-nav a {
+    color: var(--gc-land-text);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    margin-left: 1.75rem;
+}
+.gc-landing-nav a:hover { color: var(--gc-accent); }
+.gc-landing-nav .gc-nav-cta {
+    background: var(--gc-accent);
+    color: #1A1200;
+    padding: 0.45rem 1.1rem;
+    border-radius: 999px;
+}
+.gc-landing-nav .gc-nav-cta:hover { color: #1A1200; opacity: 0.9; }
+
 .gc-hero {
-    background: linear-gradient(135deg, var(--gc-navy) 0%, var(--gc-navy-2) 100%);
+    background: linear-gradient(160deg, var(--gc-navy) 0%, #050508 100%);
+    border: 1px solid var(--gc-land-border);
     border-radius: 24px;
     padding: 3rem 2.5rem;
-    color: #F5F6FA;
-    margin-bottom: 1.75rem;
+    color: var(--gc-land-text);
+    margin-bottom: 1.5rem;
 }
 .gc-wordmark {
     color: var(--gc-accent);
@@ -201,15 +235,101 @@ button[kind="primaryFormSubmit"] p {
     margin: 0;
 }
 
+/* --- tira de fatos técnicos (equivalente neutro à "prova social") ------- */
+.gc-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2.5rem;
+    padding: 0 0.25rem 2rem 0.25rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--gc-land-border);
+}
+.gc-fact-value {
+    color: var(--gc-accent);
+    font-weight: 800;
+    font-size: 1.3rem;
+    display: block;
+}
+.gc-fact-label {
+    color: var(--gc-land-muted);
+    font-size: 0.82rem;
+}
+
+/* --- ticker/faixa de sinais monitorados ---------------------------------- */
+.gc-ticker {
+    overflow: hidden;
+    white-space: nowrap;
+    border-top: 1px solid var(--gc-land-border);
+    border-bottom: 1px solid var(--gc-land-border);
+    padding: 0.8rem 0;
+    margin: 0 0 2.25rem 0;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+.gc-ticker-track {
+    display: inline-block;
+    animation: gc-ticker-scroll 32s linear infinite;
+}
+.gc-ticker-item {
+    display: inline-block;
+    color: var(--gc-land-muted);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.gc-ticker-item .gc-dot { color: var(--gc-accent); margin: 0 1.4rem; }
+@keyframes gc-ticker-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+}
+
 .gc-section-title {
-    color: var(--gc-ink);
+    color: var(--gc-land-text);
     font-weight: 800;
     font-size: 1.4rem;
     margin: 0 0 0.3rem 0;
 }
 .gc-section-sub {
-    color: var(--gc-muted);
+    color: var(--gc-land-muted);
     margin: 0 0 1.25rem 0;
+}
+.gc-eyebrow {
+    color: var(--gc-accent);
+    font-weight: 700;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 0.4rem 0;
+}
+
+/* --- contexto (por que isso existe) -------------------------------------- */
+.gc-context {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2.5rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .gc-context { grid-template-columns: 1fr; }
+}
+.gc-context h2 {
+    color: var(--gc-land-text);
+    font-size: 1.7rem;
+    font-weight: 800;
+    line-height: 1.3;
+    margin: 0;
+}
+.gc-context .gc-muted-strong { color: var(--gc-land-muted); }
+.gc-context-list { display: flex; flex-direction: column; gap: 0.6rem; }
+.gc-context-item {
+    background: var(--gc-land-card);
+    border: 1px solid var(--gc-land-border);
+    border-radius: 12px;
+    padding: 0.8rem 1rem;
+    color: #D7D6DC;
+    font-size: 0.92rem;
 }
 
 .gc-grid {
@@ -222,28 +342,56 @@ button[kind="primaryFormSubmit"] p {
     .gc-grid { grid-template-columns: repeat(2, 1fr); }
 }
 .gc-card {
-    background: var(--gc-card);
-    border: 1px solid var(--gc-border);
+    background: var(--gc-land-card);
+    border: 1px solid var(--gc-land-border);
     border-radius: var(--gc-radius);
     padding: 1.25rem;
-    box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
 }
 .gc-card .gc-icon {
     font-size: 1.6rem;
     display: inline-block;
-    background: var(--gc-accent-soft);
+    background: rgba(242, 169, 59, 0.14);
     border-radius: 10px;
     padding: 0.4rem 0.55rem;
     margin-bottom: 0.6rem;
 }
 .gc-card h4 {
     margin: 0 0 0.35rem 0;
-    color: var(--gc-ink);
+    color: var(--gc-land-text);
     font-size: 1.02rem;
 }
 .gc-card p {
     margin: 0;
-    color: var(--gc-muted);
+    color: var(--gc-land-muted);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+/* --- como funciona (passos numerados) ------------------------------------ */
+.gc-steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+}
+@media (max-width: 900px) {
+    .gc-steps { grid-template-columns: 1fr; }
+}
+.gc-step-number {
+    color: var(--gc-accent);
+    font-weight: 800;
+    font-size: 1.6rem;
+    display: block;
+    margin-bottom: 0.4rem;
+}
+.gc-step h4 {
+    color: var(--gc-land-text);
+    margin: 0 0 0.35rem 0;
+    font-size: 1.02rem;
+}
+.gc-step p {
+    color: var(--gc-land-muted);
+    margin: 0;
     font-size: 0.92rem;
     line-height: 1.45;
 }
@@ -255,41 +403,87 @@ button[kind="primaryFormSubmit"] p {
     margin-bottom: 1.75rem;
 }
 .gc-screen {
-    border: 1px solid var(--gc-border);
-    background: var(--gc-card);
+    border: 1px solid var(--gc-land-border);
+    background: var(--gc-land-card);
     border-radius: var(--gc-radius);
     padding: 1rem 1.1rem;
 }
 .gc-screen .gc-screen-title {
     font-weight: 700;
-    color: var(--gc-ink);
+    color: var(--gc-land-text);
     font-size: 0.95rem;
     margin-bottom: 0.25rem;
 }
 .gc-screen p {
     margin: 0;
-    color: var(--gc-muted);
+    color: var(--gc-land-muted);
     font-size: 0.88rem;
     line-height: 1.4;
 }
 
 .gc-disclaimer {
-    border: 1px solid var(--gc-border);
+    border: 1px solid var(--gc-land-border);
     border-left: 4px solid var(--gc-accent);
-    background: var(--gc-accent-soft);
+    background: var(--gc-land-card);
     border-radius: var(--gc-radius);
     padding: 1.1rem 1.3rem;
     margin-bottom: 2rem;
 }
-.gc-disclaimer strong { color: var(--gc-accent-text); }
-.gc-disclaimer p { margin: 0.3rem 0 0 0; color: var(--gc-ink); font-size: 0.94rem; line-height: 1.5; }
+.gc-disclaimer strong { color: var(--gc-accent); }
+.gc-disclaimer p { margin: 0.3rem 0 0 0; color: #D7D6DC; font-size: 0.94rem; line-height: 1.5; }
+
+/* --- perguntas frequentes (st.expander dentro de st.container(key=...)) --
+   st.expander é um widget nativo, não aninha dentro do HTML que a landing
+   injeta via st.markdown — por isso o escopo usa a classe st-key-<key> que
+   o próprio Streamlit gera para um st.container(key=...), em vez de tentar
+   um wrapper de div que não existiria de verdade no DOM. Sem esse escopo,
+   estilizar [data-testid="stExpander"] direto afetaria os expanders das
+   Telas 2 e 3 também. */
+.st-key-gc_faq [data-testid="stExpander"] {
+    background: var(--gc-land-card);
+    border: 1px solid var(--gc-land-border);
+    border-radius: 12px;
+    margin-bottom: 0.6rem;
+}
+.st-key-gc_faq [data-testid="stExpander"] summary {
+    color: var(--gc-land-text) !important;
+    font-weight: 600;
+}
+.st-key-gc_faq [data-testid="stExpander"] p {
+    color: var(--gc-land-muted) !important;
+}
 
 .gc-cta-heading {
     text-align: center;
     margin: 0.5rem 0 1.25rem 0;
 }
-.gc-cta-heading h3 { margin: 0 0 0.25rem 0; color: var(--gc-ink); }
-.gc-cta-heading p { margin: 0; color: var(--gc-muted); }
+.gc-cta-heading h3 { margin: 0 0 0.25rem 0; color: var(--gc-land-text); }
+.gc-cta-heading p { margin: 0; color: var(--gc-land-muted); }
+
+/* Cartão do login escurecido para combinar com o resto da landing — escopado
+   por st.container(key="gc_login") porque st.form() não gera uma classe
+   st-key-<key> própria (confirmado inspecionando o DOM real; só
+   st.container(key=...) gera). O campo de texto em si mantém o estilo nativo
+   claro do Streamlit (não dá pra forçar escuro em widgets nativos, ver topo
+   do arquivo) — funciona bem como uma "pílula" clara sobre o cartão escuro. */
+.st-key-gc_login [data-testid="stForm"] {
+    background: var(--gc-land-card) !important;
+    border-color: var(--gc-land-border) !important;
+}
+.st-key-gc_login label {
+    color: var(--gc-land-text) !important;
+}
+
+.gc-landing-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 1.5rem;
+    margin-top: 1rem;
+    border-top: 1px solid var(--gc-land-border);
+    color: var(--gc-land-muted);
+    font-size: 0.82rem;
+}
 """
 
 
@@ -298,16 +492,40 @@ def _build_css(dark: bool) -> str:
     return f":root {{{_CONSTANTES}{paleta}}}\n{_ESTILO_BASE}"
 
 
-def inject_css() -> None:
+_CSS_CANVAS_LANDING = """
+/* Fundo do próprio Streamlit (fora do que este módulo desenha) forçado
+   escuro só na landing — as páginas autenticadas continuam seguindo o tema
+   nativo claro/escuro do viewer, então isso nunca entra nesse CSS quando
+   landing=False. */
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.stApp {
+    background: var(--gc-land-bg) !important;
+}
+[data-testid="stHeader"] {
+    background: var(--gc-land-bg) !important;
+    border-bottom: 1px solid var(--gc-land-border) !important;
+}
+"""
+
+
+def inject_css(landing: bool = False) -> None:
     """Injeta o CSS na paleta certa para o tema ativo no navegador.
 
     `st.context.theme.type` é a API oficial para ler claro/escuro (inferida do
     fundo do app). A própria documentação avisa que pode ficar desatualizada
     por um instante logo após o usuário trocar de tema — é inofensivo aqui:
     a próxima interação já corrige, e nada quebra visualmente nesse meio-tempo.
+
+    `landing=True` também escurece o canvas do próprio Streamlit (por trás do
+    que as classes .gc-* desenham) — só usado na tela pré-login, que é sempre
+    escura independente do tema do viewer (ver seção "landing" acima).
     """
     escuro = st.context.theme.type == "dark"
-    st.markdown(f"<style>{_build_css(escuro)}</style>", unsafe_allow_html=True)
+    css = _build_css(escuro)
+    if landing:
+        css += _CSS_CANVAS_LANDING
+    st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def page_header(icon: str, title: str, subtitle: str | None = None) -> None:

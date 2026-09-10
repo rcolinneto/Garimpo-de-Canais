@@ -27,6 +27,51 @@ TIPOS_DE_SINAL = [
     "elegivel_parceria_plataforma",
 ]
 
+# Termos que passam na faixa animada da landing (docs/05) — só rótulos legíveis
+# do que o sistema já reconhece, sem número de negócio nenhum.
+TERMOS_TICKER = [
+    "Link de afiliado",
+    "Loja própria",
+    "Infoproduto",
+    "Comunidade paga",
+    "Link agregador",
+    "Patrocínio mencionado",
+    "Elegibilidade ao YouTube Partner Program",
+    "Crescimento de inscritos",
+    "Viralidade do nicho",
+]
+
+# Perguntas frequentes da landing — conteúdo explicativo, não objeção de venda.
+FAQ = [
+    (
+        "O score reflete a receita real do canal?",
+        "Não. É uma estimativa por evidência indireta — nenhuma ferramenta de mercado "
+        "tem acesso à receita real de um canal de terceiros. O score prioriza o que "
+        "vale investigar, não afirma quanto alguém fatura.",
+    ),
+    (
+        "De onde vêm os dados?",
+        "Da YouTube Data API v3, oficial e gratuita dentro da cota diária. Não há "
+        "scraping nem coleta fora dos termos de uso da plataforma.",
+    ),
+    (
+        "Com que frequência os dados são atualizados?",
+        "Um snapshot diário automático de todos os canais monitorados, mais a opção "
+        "de disparar uma busca manual por um nicho específico a qualquer momento, "
+        "direto na tela 'Canais Descobertos'.",
+    ),
+    (
+        "Os nichos são escolhidos pelo sistema?",
+        "Não — são cadastrados manualmente na tela 'Configuração de Nichos'. O "
+        "sistema garimpa dentro dos nichos que você definir, não decide nichos sozinho.",
+    ),
+    (
+        "O que acontece se um canal sai do ar?",
+        "O histórico já coletado permanece; o canal só é marcado como removido. "
+        "Nada é apagado.",
+    ),
+]
+
 
 # --- autenticação -----------------------------------------------------------
 
@@ -34,37 +79,74 @@ TIPOS_DE_SINAL = [
 def _apresentacao() -> None:
     """Landing page de apresentação para quem chega sem contexto.
 
-    De propósito não mostra nenhum número real: o dashboard fica atrás de senha
-    justamente porque expõe análise de mercado (docs/09), e esta tela é pública
-    para quem alcança a URL. É conteúdo estático (HTML/CSS embutido) — não faz
-    nenhuma chamada à API, então não tem como vazar dado nenhum.
+    Layout inspirado em fitagenda-amber.vercel.app (tema escuro, ticker de
+    recursos, passos numerados, FAQ) — adaptado para explicar, não vender:
+    sem agitação de dor, sem preço, sem urgência artificial. De propósito não
+    mostra nenhum número real do negócio: o dashboard fica atrás de senha
+    justamente porque expõe análise de mercado (docs/09), e esta tela é
+    pública para quem alcança a URL. É conteúdo estático (HTML/CSS embutido)
+    — não faz nenhuma chamada à API, então não tem como vazar dado nenhum.
     """
     st.markdown(
         """
-        <div class="gc-hero">
+        <div class="gc-landing-nav">
           <p class="gc-wordmark">📡 GARIMPO DE CANAIS</p>
+          <div>
+            <a href="#como-funciona">Como funciona</a>
+            <a href="#perguntas">Perguntas</a>
+            <a href="#acessar" class="gc-nav-cta">Acessar →</a>
+          </div>
+        </div>
+        <div class="gc-hero">
           <span class="gc-badge">🛰️ Coleta automática · YouTube Data API v3</span>
-          <h1>O radar que garimpa canais do <span class="gc-accent-word">YouTube</span>
-              antes de o nicho saturar</h1>
-          <p>Todos os dias, sozinho, o sistema procura canais pequenos que estão crescendo
-             dentro dos nichos que você escolher — e verifica quais já dão sinais de estar
-             sendo monetizados. O resultado é um radar de oportunidades: onde entrar,
-             com qual formato, antes que o assunto vire commodity.</p>
+          <h1>Um radar que acompanha canais do <span class="gc-accent-word">YouTube</span>
+              em crescimento, todos os dias, sozinho</h1>
+          <p>O sistema procura canais pequenos que estão crescendo dentro dos nichos
+             configurados e verifica quais já dão sinais de estar sendo monetizados —
+             sempre guardando a evidência exata de cada achado, para conferência manual
+             antes de qualquer decisão.</p>
+        </div>
+
+        <div class="gc-facts">
+          <div><span class="gc-fact-value">YouTube Data API v3</span><span class="gc-fact-label">fonte dos dados, sem scraping</span></div>
+          <div><span class="gc-fact-value">Diária</span><span class="gc-fact-label">frequência da coleta</span></div>
+          <div><span class="gc-fact-value">3 componentes</span><span class="gc-fact-label">formam o score de priorização</span></div>
+          <div><span class="gc-fact-value">7 tipos</span><span class="gc-fact-label">de sinal de monetização reconhecidos</span></div>
+        </div>
+
+        <div class="gc-ticker"><div class="gc-ticker-track">
+        """
+        + "".join(
+            f'<span class="gc-ticker-item">{termo}<span class="gc-dot">•</span></span>'
+            for termo in TERMOS_TICKER * 2
+        )
+        + """
+        </div></div>
+
+        <div class="gc-context">
+          <h2>Nichos viram centenas de canais novos por semana —
+              <span class="gc-muted-strong">olhar cada um manualmente não escala.</span></h2>
+          <div class="gc-context-list">
+            <div class="gc-context-item">Sinais de monetização ficam escondidos na descrição do canal e dos vídeos, não na aba "Sobre".</div>
+            <div class="gc-context-item">Crescimento real exige comparar ao longo do tempo — um único snapshot não mostra tendência.</div>
+            <div class="gc-context-item">Um nicho "aquecido" é vários canais crescendo juntos, não um vídeo viral isolado.</div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
     st.markdown(
-        '<p class="gc-section-title">O que ele faz</p>'
-        '<p class="gc-section-sub">Quatro etapas que rodam sozinhas, todos os dias.</p>',
+        '<p class="gc-eyebrow">O que ele faz</p>'
+        '<p class="gc-section-title">Quatro etapas que rodam sozinhas</p>'
+        '<p class="gc-section-sub">Todos os dias, sem intervenção manual.</p>',
         unsafe_allow_html=True,
     )
     blocos = [
         ("🔎", "Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho — não recadastra quem já estourou."),
         ("📈", "Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo, não só o número de hoje."),
         ("💰", "Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência exata de cada achado."),
-        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um único score, para você saber o que vale olhar primeiro."),
+        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um único score, para saber o que vale olhar primeiro."),
     ]
     st.markdown(
         '<div class="gc-grid">'
@@ -77,7 +159,30 @@ def _apresentacao() -> None:
         unsafe_allow_html=True,
     )
 
+    st.markdown('<div id="como-funciona"></div>', unsafe_allow_html=True)
     st.markdown(
+        '<p class="gc-eyebrow">Por baixo do capô</p>'
+        '<p class="gc-section-title">Como funciona</p>',
+        unsafe_allow_html=True,
+    )
+    passos = [
+        ("01", "Descoberta", "Busca vídeos recentes nas palavras-chave de cada nicho e verifica se o canal por trás ainda é pequeno o suficiente para ser uma descoberta, não um recadastro."),
+        ("02", "Snapshot diário", "Registra inscritos, views e engajamento de cada canal já conhecido, formando o histórico que sustenta o cálculo de crescimento."),
+        ("03", "Enriquecimento", "Varre descrições em busca de sinais de monetização e recalcula o score de cada canal com o que mudou no dia."),
+    ]
+    st.markdown(
+        '<div class="gc-steps">'
+        + "".join(
+            f'<div class="gc-step"><span class="gc-step-number">{num}</span>'
+            f"<h4>{titulo}</h4><p>{texto}</p></div>"
+            for num, titulo, texto in passos
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<p class="gc-eyebrow">Dentro do dashboard</p>'
         '<p class="gc-section-title">O que você encontra lá dentro</p>'
         '<p class="gc-section-sub">Cinco telas, cada uma resolvendo uma pergunta diferente.</p>',
         unsafe_allow_html=True,
@@ -106,16 +211,28 @@ def _apresentacao() -> None:
           <p>O sistema <strong>estima</strong> monetização por evidência indireta — um link
              de pagamento na descrição, um e-book anunciado. Ele nunca sabe quanto um canal
              de terceiros realmente fatura, e nenhuma ferramenta do mercado sabe isso. Por
-             isso cada sinal vem com a evidência exata que o gerou, para você conferir antes
-             de decidir qualquer coisa.</p>
+             isso cada sinal vem com a evidência exata que o gerou, para conferência manual
+             antes de qualquer decisão.</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+    st.markdown('<div id="perguntas"></div>', unsafe_allow_html=True)
     st.markdown(
-        '<div class="gc-cta-heading"><h3>Pronto para explorar os achados de hoje?</h3>'
-        "<p>Entre com a senha da equipe para abrir o dashboard.</p></div>",
+        '<p class="gc-eyebrow">Dúvidas comuns</p>'
+        '<p class="gc-section-title">Perguntas frequentes</p>',
+        unsafe_allow_html=True,
+    )
+    with st.container(key="gc_faq"):
+        for pergunta, resposta in FAQ:
+            with st.expander(pergunta):
+                st.write(resposta)
+
+    st.markdown('<div id="acessar"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="gc-cta-heading"><h3>Acessar o dashboard</h3>'
+        "<p>Entre com a senha da equipe.</p></div>",
         unsafe_allow_html=True,
     )
 
@@ -136,15 +253,26 @@ def autenticar() -> bool:
         )
         return False
 
-    _, meio, _ = st.columns([1, 1.2, 1])
-    with meio.form("login"):
-        senha = st.text_input("Senha", type="password", placeholder="Senha da equipe")
-        if st.form_submit_button("Entrar no dashboard →", type="primary", use_container_width=True):
-            if hmac.compare_digest(senha, settings.dashboard_password):
-                st.session_state["autenticado"] = True
-                st.rerun()
-            else:
-                st.error("Senha incorreta.")
+    with st.container(key="gc_login"):
+        _, meio, _ = st.columns([1, 1.2, 1])
+        with meio.form("login"):
+            senha = st.text_input("Senha", type="password", placeholder="Senha da equipe")
+            if st.form_submit_button(
+                "Entrar no dashboard →", type="primary", use_container_width=True
+            ):
+                if hmac.compare_digest(senha, settings.dashboard_password):
+                    st.session_state["autenticado"] = True
+                    st.rerun()
+                else:
+                    st.error("Senha incorreta.")
+
+    st.markdown(
+        '<div class="gc-landing-footer">'
+        "<span>📡 Garimpo de Canais</span>"
+        "<span>Coleta automática via YouTube Data API v3</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
     return False
 
 
@@ -657,7 +785,9 @@ def tela_alertas() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Garimpo de Canais", page_icon="📡", layout="wide")
-    inject_css()
+    # A landing (pré-login) é sempre escura, independente do tema do viewer —
+    # ver docs em styles.py. O app autenticado continua seguindo claro/escuro.
+    inject_css(landing=not st.session_state.get("autenticado"))
     if not autenticar():
         return
 
