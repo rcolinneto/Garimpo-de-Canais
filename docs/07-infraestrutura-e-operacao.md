@@ -20,6 +20,15 @@ A combinação que não exige cartão em lugar nenhum:
 
 Para esse caminho: `SCHEDULER_ENABLED=false` (desliga o APScheduler interno, redundante aqui) e `CRON_SECRET` configurado — os dois endpoints `/cron/*` recusam qualquer chamada sem o segredo certo (fecham por padrão, mesma lógica do `DASHBOARD_PASSWORD`). Os secrets `RENDER_API_URL` e `CRON_SECRET` do workflow ficam em Settings → Secrets and variables → Actions do repositório.
 
+### Serviço dormindo: por que não é erro, e como é tratado
+
+O Render desliga um serviço gratuito depois de 15 min sem tráfego. A primeira chamada depois disso não falha de verdade — ela espera dezenas de segundos enquanto o contêiner sobe, e às vezes cai num 502/503/504 do proxy da hospedagem no meio do caminho. Isso é tratado em duas camadas:
+
+1. **No dashboard** (`src/dashboard/api_client.py`): uma resposta 502/503/504 ou uma conexão recusada não vira erro na tela na hora. O cliente espera e tenta de novo por até `ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS` (90s), tempo de sobra para a API acordar. Quem está usando só vê a tela demorar um pouco mais. Só depois dessa janela é que aparece uma mensagem — e nunca o corpo cru da resposta do proxy, que é uma página HTML inteira, com fonte em base64 embutida, e já apareceu vazando dentro da tela por causa disso.
+2. **Nos workflows**: o `keepalive.yml` mantém os dois serviços de pé em horário comercial (seg-sex, 9h-19h), que é quando alguém abre o dashboard; e o `cron.yml`, que roda de madrugada com tudo dormindo, acorda a API com `/health` antes de disparar a coleta.
+
+**Orçamento de horas (a restrição que define o desenho acima):** o Render dá 750 horas gratuitas por **workspace**, compartilhadas entre todos os serviços — não 750h por serviço. Manter `app` e `dashboard` acordados 24/7 custaria ~1.460h/mês, e ao estourar as 750h o Render **suspende todos os serviços gratuitos até o mês virar**. Por isso o keepalive é limitado ao horário comercial: 2 serviços × ~10h/dia × ~22 dias úteis ≈ **440h/mês**, com folga. Fora dessa janela os serviços dormem de propósito, e a espera é absorvida pela camada 1.
+
 Esses endpoints devolvem `202` na hora e rodam o job em segundo plano — não dependem de a plataforma tolerar uma requisição de vários minutos. Se a chamada for interrompida ou a cota estourar no meio, o que já foi commitado por nicho continua salvo (`src/scheduler/discovery.py`).
 
 ## Agendamento

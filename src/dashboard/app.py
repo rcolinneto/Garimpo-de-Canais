@@ -310,7 +310,8 @@ def autenticar() -> bool:
 def carregar(funcao, *args, **kwargs):
     """Executa uma chamada de API mostrando o erro na tela em vez de estourar."""
     try:
-        return funcao(*args, **kwargs)
+        with st.spinner("Carregando dados..."):
+            return funcao(*args, **kwargs)
     except ApiError as erro:
         st.error(str(erro))
         return None

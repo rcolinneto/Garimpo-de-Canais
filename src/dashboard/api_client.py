@@ -5,6 +5,7 @@ aqui, que é a regra arquitetural de `docs/02-arquitetura.md`: é o que permite
 trocar a camada de apresentação depois sem reescrever o resto do sistema.
 """
 
+import time
 from typing import Any
 
 import requests
@@ -15,6 +16,17 @@ TIMEOUT_SEGUNDOS = 30
 # A busca sob demanda é síncrona e chama a API do YouTube na hora — pode levar
 # bem mais que o timeout padrão para um nicho com muitos candidatos.
 TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
+
+# Hospedagem gratuita desliga o serviço da API depois de um tempo ocioso. A
+# primeira chamada depois disso não falha de verdade: ela cai num 502/503/504
+# do proxy (ou numa conexão recusada) durante as dezenas de segundos em que o
+# contêiner está subindo, e funciona se for repetida. Em vez de mostrar um erro
+# que "some sozinho quando você recarrega", esperamos a API acordar dentro
+# desta janela e tentamos de novo — quem está usando só vê a tela demorar um
+# pouco mais.
+ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS = 90
+INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS = 5
+STATUS_API_ACORDANDO = (502, 503, 504)
 
 
 class ApiError(RuntimeError):
@@ -53,11 +65,22 @@ def _tratar(resposta: requests.Response) -> Any:
 
 
 def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwargs) -> Any:
-    try:
-        resposta = requests.request(metodo, _url(path), timeout=timeout, **kwargs)
-    except requests.RequestException as erro:
-        raise ApiError(f"Não foi possível falar com a API ({settings.api_base_url}): {erro}") from erro
-    return _tratar(resposta)
+    limite = time.monotonic() + ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS
+    while True:
+        # Só vale insistir enquanto a janela de espera não estourou; passado
+        # isso, o próximo resultado é o definitivo (vira erro na tela).
+        insistir = time.monotonic() < limite
+        try:
+            resposta = requests.request(metodo, _url(path), timeout=timeout, **kwargs)
+        except requests.RequestException as erro:
+            if not insistir:
+                raise ApiError(
+                    f"Não foi possível falar com a API ({settings.api_base_url}): {erro}"
+                ) from erro
+        else:
+            if resposta.status_code not in STATUS_API_ACORDANDO or not insistir:
+                return _tratar(resposta)
+        time.sleep(INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS)
 
 
 def listar_canais(**filtros) -> dict:

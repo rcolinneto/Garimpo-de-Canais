@@ -38,8 +38,26 @@ jobs:
             echo "endpoint=snapshot" >> "$GITHUB_OUTPUT"
           fi
 
+      # Estes jobs rodam de madrugada, quando o serviço da API está dormindo
+      # (o keepalive só cobre horário comercial). Subir o contêiner leva
+      # dezenas de segundos, então acordamos a API antes de disparar o job —
+      # sem isso, o POST abaixo corre o risco de estourar o timeout e a coleta
+      # da noite ser perdida em silêncio.
+      - name: Acordar a API antes de disparar
+        run: |
+          for tentativa in $(seq 1 12); do
+            if curl -fsS --max-time 30 -o /dev/null "${{ secrets.RENDER_API_URL }}/health"; then
+              echo "API respondeu na tentativa $tentativa."
+              exit 0
+            fi
+            echo "API ainda subindo (tentativa $tentativa de 12)..."
+            sleep 10
+          done
+          echo "A API não respondeu depois de ~6 minutos tentando."
+          exit 1
+
       - name: Chamar a API (só dispara — a resposta 202 volta na hora)
         run: |
-          curl -fsS --max-time 30 -X POST \
+          curl -fsS --max-time 60 -X POST \
             "${{ secrets.RENDER_API_URL }}/cron/${{ steps.escolher.outputs.endpoint }}" \
             -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}"
