@@ -30,7 +30,18 @@ def _tratar(resposta: requests.Response) -> Any:
         try:
             detalhe = resposta.json().get("detail")
         except ValueError:
-            detalhe = resposta.text
+            # Resposta sem JSON — normalmente a página de erro do proxy da
+            # hospedagem (não da nossa API), ex.: 502 enquanto o serviço `app`
+            # ainda está acordando depois de ficar ocioso. Nunca repassar esse
+            # HTML cru para a tela: além de poluído, pode conter uma fonte
+            # inteira em base64.
+            if resposta.status_code in (502, 503, 504):
+                detalhe = (
+                    "A API ainda está iniciando (comum após um período ocioso) — "
+                    "aguarde alguns segundos e tente novamente."
+                )
+            else:
+                detalhe = f"Erro HTTP {resposta.status_code} (resposta não veio em JSON)."
         if isinstance(detalhe, list):
             # Erro de validação do FastAPI (422): junta as mensagens de campo.
             detalhe = "; ".join(
