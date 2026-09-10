@@ -345,13 +345,35 @@ def test_botao_buscar_agora_mostra_aviso_quando_cota_estoura(monkeypatch):
 
 
 def test_tela_detalhe_mostra_evidencia_do_sinal():
+    """Os sinais viraram cartões HTML (não mais st.dataframe) — a evidência
+    real do canal precisa aparecer em algum bloco de markdown renderizado."""
     app = rodar_tela("tela_detalhe")
 
-    tabelas = [tabela.value for tabela in app.dataframe]
-    evidencias = [
-        tabela["Evidência"].tolist() for tabela in tabelas if "Evidência" in getattr(tabela, "columns", [])
-    ]
-    assert ["https://hotmart.com/curso"] in evidencias
+    html_renderizado = " ".join(bloco.value for bloco in app.markdown)
+    assert "https://hotmart.com/curso" in html_renderizado
+    assert "link_afiliado" not in html_renderizado  # rótulo humano, não o slug cru
+
+
+def test_tela_detalhe_escapa_html_na_evidencia(monkeypatch):
+    """Evidência vem de descrição de canal — texto de terceiros. Se alguém
+    colocar `<script>` na bio, isso não pode virar HTML de verdade na tela."""
+    detalhe_malicioso = DETALHE | {
+        "sinais": [
+            {
+                "signal_type": "link_afiliado",
+                "evidence": '<script>alert(1)</script> & "aspas"',
+                "confidence": 0.9,
+                "detected_at": "2026-09-03T12:00:00+00:00",
+            }
+        ]
+    }
+    monkeypatch.setattr(api_client, "detalhar_canal", lambda channel_id: detalhe_malicioso)
+
+    app = rodar_tela("tela_detalhe")
+
+    html_renderizado = " ".join(bloco.value for bloco in app.markdown)
+    assert "<script>" not in html_renderizado
+    assert "&lt;script&gt;" in html_renderizado
 
 
 def test_tela_alertas_mostra_limiar_e_historico():

@@ -7,6 +7,7 @@ Execução: streamlit run src/dashboard/app.py
 """
 
 import hmac
+import html
 
 import pandas as pd
 import streamlit as st
@@ -14,7 +15,7 @@ import streamlit as st
 from src.config.settings import settings
 from src.dashboard import api_client
 from src.dashboard.api_client import ApiError
-from src.dashboard.styles import inject_css, page_header
+from src.dashboard.styles import eyebrow, inject_css, page_header
 
 # Taxonomia de docs/05-motor-monetizacao-e-score.md, usada no filtro da Tela 2.
 TIPOS_DE_SINAL = [
@@ -71,6 +72,33 @@ FAQ = [
         "Nada é apagado.",
     ),
 ]
+
+
+# Rótulos legíveis para a taxonomia de sinais de monetização (docs/05) — a API
+# devolve o slug técnico em snake_case; a tela mostra o que faz sentido pra
+# quem não escreveu o código.
+SIGNAL_LABELS = {
+    "link_afiliado": "Link de afiliado",
+    "loja_propria": "Loja própria",
+    "infoproduto": "Infoproduto",
+    "comunidade_paga": "Comunidade paga",
+    "link_agregador": "Link agregador",
+    "patrocinio_mencionado": "Patrocínio mencionado",
+    "elegivel_parceria_plataforma": "Elegível à parceria (YPP)",
+}
+
+
+def rotulo_sinal(slug: str) -> str:
+    return SIGNAL_LABELS.get(slug, slug)
+
+
+# Paleta dos gráficos — consistente com a marca, no lugar do azul padrão do
+# Vega-Lite. Usada na ordem: principal, acento, e dois tons de apoio para
+# quando um gráfico tem vários componentes (ex.: score total + seus 3 fatores).
+COR_PRIMARIA = "#16233F"
+COR_ACENTO = "#F2A93B"
+COR_SECUNDARIA = "#2E7D6B"
+COR_TERCIARIA = "#A9598B"
 
 
 # --- autenticação -----------------------------------------------------------
@@ -301,7 +329,7 @@ def formatar_canais(itens: list[dict]) -> pd.DataFrame:
                 # (canal recém-descoberto), não é um erro nem um zero.
                 "Cresc. 7d (%)": _arredondar(item["crescimento_7d"]),
                 "Cresc. 30d (%)": _arredondar(item["crescimento_30d"]),
-                "Sinais": ", ".join(item["sinais_monetizacao"]) or "—",
+                "Sinais": ", ".join(rotulo_sinal(s) for s in item["sinais_monetizacao"]) or "—",
                 "Score": _arredondar(item["total_score"]),
                 "Descoberto em": (item["discovered_at"] or "")[:10],
                 "id": item["id"],
@@ -352,6 +380,8 @@ def tela_visao_geral() -> None:
     colunas[1].metric("Canais ativos", total_canais)
     colunas[2].metric("Novos esta semana", novos)
 
+    st.divider()
+    eyebrow("Ranking")
     st.subheader("Nichos por viralidade")
     st.caption(
         "Viralidade = crescimento médio dos canais ativos daquele nicho. Um nicho onde "
@@ -376,6 +406,8 @@ def tela_visao_geral() -> None:
         hide_index=True,
     )
 
+    st.divider()
+    eyebrow("Tendência")
     st.subheader("Evolução da viralidade")
     por_nome = {nicho["name"]: nicho["niche_id"] for nicho in nichos}
     escolhido = st.selectbox("Nicho", list(por_nome.keys()))
@@ -387,7 +419,7 @@ def tela_visao_geral() -> None:
         return
     serie = pd.DataFrame(historico)
     serie["dia"] = pd.to_datetime(serie["dia"])
-    st.line_chart(serie.set_index("dia")["niche_virality_score"])
+    st.line_chart(serie.set_index("dia")["niche_virality_score"], color=COR_PRIMARIA)
 
 
 # --- Tela 2 -----------------------------------------------------------------
@@ -469,6 +501,7 @@ def tela_canais() -> None:
         sinais = st.multiselect(
             "Sinais de monetização",
             TIPOS_DE_SINAL,
+            format_func=rotulo_sinal,
             help="Mostra só canais com pelo menos um destes sinais detectado nos últimos 30 dias.",
         )
         descobertos_em = st.selectbox(
@@ -494,7 +527,8 @@ def tela_canais() -> None:
         return
 
     itens = dados["items"]
-    st.caption(f"{len(itens)} de {dados['total']} canais no filtro atual, ordenados por score.")
+    eyebrow(f"{len(itens)} de {dados['total']} canais no filtro atual")
+    st.caption("Ordenados por score — o mais promissor primeiro.")
     if not itens:
         st.info("Nenhum canal bate com esses filtros.")
         return
@@ -547,13 +581,25 @@ def tela_detalhe() -> None:
         return
 
     st.header(canal["display_name"] or canal["youtube_channel_id"])
+    cabecalho = []
+    if canal["niche_name"]:
+        cabecalho.append(f'<span class="gc-badge-pill">{html.escape(canal["niche_name"])}</span>')
     if canal["url"]:
-        st.markdown(f"🔗 [Abrir canal no YouTube]({canal['url']})")
-    colunas = st.columns(4)
+        # Construída pelo nosso próprio backend (_channel_url), mas escapamos
+        # mesmo assim — sem confiar em "isso nunca teria caractere especial".
+        cabecalho.append(
+            f'🔗 <a href="{html.escape(canal["url"])}" target="_blank">Abrir canal no YouTube</a>'
+        )
+    if cabecalho:
+        st.markdown(
+            f'<div style="margin: 0.2rem 0 1rem 0;">{"&nbsp;&nbsp;".join(cabecalho)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    colunas = st.columns(3)
     colunas[0].metric("Inscritos", canal["subscriber_count"] or "oculto")
     colunas[1].metric("Score total", _arredondar(canal["total_score"]))
-    colunas[2].metric("Nicho", canal["niche_name"] or "—")
-    colunas[3].metric("Descoberto em", (canal["discovered_at"] or "")[:10])
+    colunas[2].metric("Descoberto em", (canal["discovered_at"] or "")[:10])
 
     historico = carregar(api_client.historico_canal, channel_id)
     if historico:
@@ -563,39 +609,52 @@ def tela_detalhe() -> None:
             snapshots = snapshots.set_index("collected_at")
             # Dois gráficos em vez de um: inscritos e views têm escalas muito
             # diferentes, e juntos achatariam a linha de inscritos.
+            st.divider()
+            eyebrow("Histórico")
             st.subheader("Evolução de inscritos")
-            st.line_chart(snapshots["subscriber_count"])
+            st.line_chart(snapshots["subscriber_count"], color=COR_PRIMARIA)
             st.subheader("Evolução de views totais")
-            st.line_chart(snapshots["total_view_count"])
+            st.line_chart(snapshots["total_view_count"], color=COR_PRIMARIA)
 
         scores = pd.DataFrame(historico["scores"])
         if not scores.empty:
             scores["calculated_at"] = pd.to_datetime(scores["calculated_at"])
             st.subheader("Evolução do score e seus componentes")
-            st.caption("total_score = crescimento + monetização + aquecimento do nicho, já com os pesos aplicados.")
-            st.line_chart(
-                scores.set_index("calculated_at")[
-                    ["total_score", "growth_score", "monetization_score", "niche_virality_score"]
-                ]
+            st.caption("Score total = crescimento + monetização + aquecimento do nicho, já com os pesos aplicados.")
+            componentes = scores.set_index("calculated_at")[
+                ["total_score", "growth_score", "monetization_score", "niche_virality_score"]
+            ].rename(
+                columns={
+                    "total_score": "Score total",
+                    "growth_score": "Crescimento",
+                    "monetization_score": "Monetização",
+                    "niche_virality_score": "Aquecimento do nicho",
+                }
             )
+            st.line_chart(componentes, color=[COR_PRIMARIA, COR_ACENTO, COR_SECUNDARIA, COR_TERCIARIA])
 
+    st.divider()
+    eyebrow("Prova")
     st.subheader("Sinais de monetização detectados")
     if canal["sinais"]:
         st.caption("A evidência é o que motivou cada detecção — confira antes de agir sobre ela.")
-        st.dataframe(
-            pd.DataFrame(
-                [
-                    {
-                        "Tipo": sinal["signal_type"],
-                        "Confiança": sinal["confidence"],
-                        "Evidência": sinal["evidence"],
-                        "Detectado em": (sinal["detected_at"] or "")[:10],
-                    }
-                    for sinal in canal["sinais"]
-                ]
-            ),
-            use_container_width=True,
-            hide_index=True,
+        st.markdown(
+            '<div class="gc-signal-grid">'
+            + "".join(
+                '<div class="gc-signal-card">'
+                '<div class="gc-signal-card-head">'
+                f'<span class="gc-signal-type">{html.escape(rotulo_sinal(sinal["signal_type"]))}</span>'
+                f'<span class="gc-signal-meta">confiança {_arredondar(sinal["confidence"])} · '
+                f'{(sinal["detected_at"] or "")[:10]}</span>'
+                "</div>"
+                # evidence vem de descrições reais do YouTube (texto de terceiros) —
+                # sempre escapado antes de entrar num bloco unsafe_allow_html.
+                f'<div class="gc-signal-evidence">{html.escape(sinal["evidence"] or "—")}</div>'
+                "</div>"
+                for sinal in canal["sinais"]
+            )
+            + "</div>",
+            unsafe_allow_html=True,
         )
     else:
         st.info("Nenhum sinal de monetização detectado para este canal até agora.")
@@ -604,6 +663,8 @@ def tela_detalhe() -> None:
         with st.expander("Por que este canal tem esse score?"):
             st.json(canal["score_breakdown"])
 
+    st.divider()
+    eyebrow("Conteúdo recente")
     st.subheader("Últimos vídeos coletados")
     if canal["ultimos_videos"]:
         st.dataframe(
@@ -638,6 +699,7 @@ def tela_nichos() -> None:
     if nichos is None:
         return
 
+    eyebrow("Situação atual")
     st.subheader("Nichos cadastrados")
     if nichos:
         st.dataframe(
@@ -658,6 +720,8 @@ def tela_nichos() -> None:
     else:
         st.info("Nenhum nicho cadastrado ainda.")
 
+    st.divider()
+    eyebrow("Novo")
     st.subheader("Cadastrar nicho")
     with st.form("novo_nicho"):
         nome = st.text_input("Nome do nicho")
@@ -680,6 +744,8 @@ def tela_nichos() -> None:
     if not nichos:
         return
 
+    st.divider()
+    eyebrow("Ajuste")
     st.subheader("Editar nicho")
     por_nome = {nicho["name"]: nicho for nicho in nichos}
     escolhido = por_nome[st.selectbox("Nicho a editar", list(por_nome.keys()))]
@@ -721,6 +787,7 @@ def tela_alertas() -> None:
         return
 
     limiar_vigente = config["limiar"]
+    eyebrow("Configuração vigente")
     colunas = st.columns(2)
     colunas[0].metric("Limiar configurado", limiar_vigente)
     colunas[1].metric("Envio por e-mail", "ativo" if config["email_configurado"] else "não configurado")
@@ -748,6 +815,8 @@ def tela_alertas() -> None:
     if dados is None:
         return
 
+    st.divider()
+    eyebrow("Simulação")
     st.subheader(f"Canais acima do limiar hoje ({dados['total']})")
     if dados["items"]:
         st.dataframe(
@@ -756,8 +825,10 @@ def tela_alertas() -> None:
             hide_index=True,
         )
     else:
-        st.write("Nenhum canal cruzou esse limiar até agora.")
+        st.info("Nenhum canal cruzou esse limiar até agora.")
 
+    st.divider()
+    eyebrow("Registro")
     st.subheader("Histórico de alertas enviados")
     alertas = carregar(api_client.listar_alertas)
     if alertas:
@@ -777,7 +848,7 @@ def tela_alertas() -> None:
             hide_index=True,
         )
     else:
-        st.write("Nenhum alerta disparado até agora.")
+        st.info("Nenhum alerta disparado até agora.")
 
 
 # --- navegação --------------------------------------------------------------
@@ -801,10 +872,7 @@ def main() -> None:
     # Navegação na barra lateral (posição padrão do st.navigation). A Tela 2
     # soma seus próprios filtros logo abaixo da lista de páginas.
     with st.sidebar:
-        st.caption(
-            "🌙 Tema claro/escuro: menu ⋮ no canto superior direito → Settings → "
-            "Choose app theme."
-        )
+        st.caption("🌙 Tema: menu ⋮ → Settings", help="Escolha claro ou escuro no menu do topo direito.")
     st.navigation(paginas).run()
 
 

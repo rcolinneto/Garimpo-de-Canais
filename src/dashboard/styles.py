@@ -158,6 +158,61 @@ button[kind="primaryFormSubmit"] p {
     border-right: 1px solid var(--gc-border);
 }
 
+/* --- app autenticado: rótulos de seção e cartões de evidência -------------- */
+/* Reativos ao tema (--gc-ink/--gc-card mudam com claro/escuro) — distintos das
+   classes .gc-* da landing, que são fixas em escuro. */
+.gc-app-eyebrow {
+    color: var(--gc-accent-text);
+    font-weight: 700;
+    font-size: 0.76rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin: 0 0 0.2rem 0;
+}
+.gc-badge-pill {
+    display: inline-block;
+    background: var(--gc-accent-soft);
+    color: var(--gc-accent-text);
+    border-radius: 999px;
+    padding: 0.2rem 0.75rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+.gc-signal-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+}
+.gc-signal-card {
+    background: var(--gc-card);
+    border: 1px solid var(--gc-border);
+    border-left: 3px solid var(--gc-accent);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+}
+.gc-signal-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.3rem;
+}
+.gc-signal-type {
+    color: var(--gc-ink);
+    font-weight: 700;
+    font-size: 0.94rem;
+}
+.gc-signal-meta {
+    color: var(--gc-muted);
+    font-size: 0.8rem;
+}
+.gc-signal-evidence {
+    color: var(--gc-muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
 /* --- landing (pré-login) --------------------------------------------------- */
 /* Sempre escura, nos dois temas — é a marca (inspirada em fitagenda-amber.
    vercel.app), não a interface de trabalho, então não segue claro/escuro.
@@ -537,3 +592,9 @@ def page_header(icon: str, title: str, subtitle: str | None = None) -> None:
     st.title(f"{icon}  {title}")
     if subtitle:
         st.caption(subtitle)
+
+
+def eyebrow(texto: str) -> None:
+    """Rótulo pequeno em caixa alta acima de uma subseção — mesmo padrão
+    visual da landing, reativo ao tema (funciona em claro e escuro)."""
+    st.markdown(f'<p class="gc-app-eyebrow">{texto}</p>', unsafe_allow_html=True)
