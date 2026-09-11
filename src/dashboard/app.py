@@ -8,6 +8,7 @@ Execução: streamlit run src/dashboard/app.py
 
 import hmac
 import html
+import threading
 
 import pandas as pd
 import streamlit as st
@@ -855,11 +856,37 @@ def tela_alertas() -> None:
 # --- navegação --------------------------------------------------------------
 
 
+def acordar_api_em_segundo_plano() -> None:
+    """Começa a acordar a API assim que a landing abre, antes do login.
+
+    Na hospedagem gratuita a API desliga quando fica ociosa e leva dezenas de
+    segundos para subir. Se só a chamarmos depois do login, essa espera toda
+    acontece com a pessoa olhando para a tela. Disparando aqui, ela acontece
+    em paralelo com a leitura da landing e a digitação da senha — quando a
+    primeira tela carrega, a API normalmente já está de pé.
+
+    Roda numa thread solta e engole qualquer erro de propósito: isto é só um
+    aquecimento, quem trata falha de verdade é o `carregar()` de cada tela.
+    """
+    if st.session_state.get("api_sendo_acordada"):
+        return
+    st.session_state["api_sendo_acordada"] = True
+
+    def _aquecer() -> None:
+        try:
+            api_client.health()
+        except Exception:  # noqa: BLE001 - aquecimento não pode derrubar a tela
+            pass
+
+    threading.Thread(target=_aquecer, daemon=True).start()
+
+
 def main() -> None:
     st.set_page_config(page_title="Garimpo de Canais", page_icon="📡", layout="wide")
     # A landing (pré-login) é sempre escura, independente do tema do viewer —
     # ver docs em styles.py. O app autenticado continua seguindo claro/escuro.
     inject_css(landing=not st.session_state.get("autenticado"))
+    acordar_api_em_segundo_plano()
     if not autenticar():
         return
 

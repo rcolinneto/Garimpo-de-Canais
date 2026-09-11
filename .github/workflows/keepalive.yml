@@ -18,6 +18,16 @@ name: Manter os serviços acordados em horário comercial (Render free tier)
 #
 # Requer os secrets RENDER_DASHBOARD_URL e RENDER_API_URL (Settings > Secrets
 # and variables > Actions).
+#
+# LIMITAÇÃO IMPORTANTE, MEDIDA NA PRÁTICA: o GitHub não honra o "*/10" em
+# repositório gratuito. Olhando o histórico real de execuções, este workflow
+# roda a cada 2-4 HORAS, e chegou a ficar 14h sem rodar nenhuma vez. Ou seja,
+# ele ajuda, mas NÃO garante serviço acordado — tratar como um bônus, nunca
+# como a solução. Quem de fato resolve a espera é o dashboard: ele acorda a
+# API em segundo plano assim que a landing abre (acordar_api_em_segundo_plano
+# em src/dashboard/app.py) e tenta de novo enquanto ela sobe (api_client.py).
+# Para keepalive confiável seria preciso um pinger externo (ex.: cron-job.org,
+# gratuito e sem cartão) apontando para as duas URLs em horário comercial.
 
 on:
   schedule:

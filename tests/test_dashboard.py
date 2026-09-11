@@ -5,6 +5,7 @@ headless — é o que prova que as telas renderizam sem exceção. As chamadas d
 são substituídas por respostas fixas, então nenhum teste depende da API no ar.
 """
 
+import time
 from pathlib import Path
 
 import pytest
@@ -416,3 +417,35 @@ def test_tela_nichos_usa_a_api_para_criar(monkeypatch):
 
     # O CRUD passa pela API, nunca pelo banco (regra de docs/02-arquitetura.md)
     assert chamadas == [("culinária fitness", ["marmita fit", "low carb"], True)]
+
+
+def test_aquecimento_da_api_dispara_uma_vez_e_nao_derruba_a_tela(monkeypatch):
+    """A API dorme na hospedagem gratuita; a landing começa a acordá-la antes
+    do login. O aquecimento é best-effort: se falhar, a tela segue normal."""
+    from src.dashboard import app as modulo_app
+
+    chamadas = []
+
+    def _health_que_falha():
+        chamadas.append(1)
+        raise api_client.ApiError("API dormindo")
+
+    monkeypatch.setattr(api_client, "health", _health_que_falha)
+    assert modulo_app.acordar_api_em_segundo_plano  # o app expõe o aquecimento
+
+    app = AppTest.from_string(
+        "from src.dashboard.app import acordar_api_em_segundo_plano\n"
+        "acordar_api_em_segundo_plano()\n"
+        "acordar_api_em_segundo_plano()",
+        default_timeout=30,
+    ).run()
+
+    # A thread é solta; dá um instante para ela terminar antes de conferir.
+    for _ in range(50):
+        if chamadas:
+            break
+        time.sleep(0.05)
+
+    assert not app.exception
+    # Duas invocações, mas só um aquecimento: o flag de sessão evita repetir.
+    assert len(chamadas) == 1
