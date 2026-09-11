@@ -343,6 +343,24 @@ def test_historico_de_nicho_inexistente_da_404(api):
 # Postgres — por isso os testes abaixo limpam esse rastro no final.
 
 
+@pytest.fixture()
+def banco_do_endpoint_alcancavel():
+    """Pula (em vez de falhar) quando a URL que o ENDPOINT usa não é alcançável.
+
+    A fixture `api` conecta pela DATABASE_URL do ambiente de teste, mas estes
+    testes exercitam o caminho em que o endpoint abre a própria SessionLocal,
+    que usa `settings.database_url`. Rodando no host essas duas URLs divergem:
+    o `.env` aponta para `db:5432`, que só resolve dentro da rede do compose.
+    Sem esta guarda o erro estoura lá dentro, longe do skip da fixture `api`,
+    e a suíte parece quebrada quando só falta rodar com a URL certa:
+        DATABASE_URL=postgresql://garimpo:...@localhost:5433/garimpo pytest
+    """
+    try:
+        create_engine(settings.database_url).connect().close()
+    except Exception as error:  # noqa: BLE001
+        pytest.skip(f"Banco de settings.database_url indisponível: {error}")
+
+
 def _limpar_logs_de_busca_manual(desde):
     engine = create_engine(DATABASE_URL)
     with engine.connect() as conn:
@@ -353,7 +371,7 @@ def _limpar_logs_de_busca_manual(desde):
         conn.commit()
 
 
-def test_buscar_agora_registra_canais_novos(api, monkeypatch):
+def test_buscar_agora_registra_canais_novos(api, monkeypatch, banco_do_endpoint_alcancavel):
     client, ids = api
     import src.api.main as api_main
 
@@ -389,7 +407,7 @@ def test_buscar_agora_registra_canais_novos(api, monkeypatch):
         _limpar_logs_de_busca_manual(inicio)
 
 
-def test_buscar_agora_reporta_parcial_quando_cota_estoura(api, monkeypatch):
+def test_buscar_agora_reporta_parcial_quando_cota_estoura(api, monkeypatch, banco_do_endpoint_alcancavel):
     client, ids = api
     import src.api.main as api_main
 
@@ -421,7 +439,7 @@ def test_buscar_agora_reporta_parcial_quando_cota_estoura(api, monkeypatch):
         _limpar_logs_de_busca_manual(inicio)
 
 
-def test_buscar_agora_sem_chave_de_api_vira_falha_controlada(api, monkeypatch):
+def test_buscar_agora_sem_chave_de_api_vira_falha_controlada(api, monkeypatch, banco_do_endpoint_alcancavel):
     client, ids = api
     import src.api.main as api_main
 
