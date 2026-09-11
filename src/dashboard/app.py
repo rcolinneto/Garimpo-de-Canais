@@ -311,7 +311,14 @@ def autenticar() -> bool:
 def carregar(funcao, *args, **kwargs):
     """Executa uma chamada de API mostrando o erro na tela em vez de estourar."""
     try:
-        with st.spinner("Carregando dados..."):
+        # A mensagem já explica a espera longa de propósito: na hospedagem
+        # gratuita o servidor desliga quando fica ocioso, e a primeira abertura
+        # do dia espera ele subir. Sem esse aviso a tela parece travada — foi
+        # exatamente assim que o problema chegou como "não abre nenhuma aba".
+        with st.spinner(
+            "Carregando dados… se o servidor estiver ocioso, a primeira "
+            "abertura pode levar até 1 minuto enquanto ele acorda."
+        ):
             return funcao(*args, **kwargs)
     except ApiError as erro:
         st.error(str(erro))

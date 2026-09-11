@@ -24,7 +24,10 @@ TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
 # que "some sozinho quando você recarrega", esperamos a API acordar dentro
 # desta janela e tentamos de novo — quem está usando só vê a tela demorar um
 # pouco mais.
-ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS = 90
+# 150s e não 90s: medindo o serviço real no Render, o tempo para subir variou
+# de 22s a mais de 70s. A janela precisa cobrir o pior caso observado com
+# folga, senão a espera termina num erro logo antes de a API ficar pronta.
+ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS = 150
 INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS = 5
 STATUS_API_ACORDANDO = (502, 503, 504)
 
