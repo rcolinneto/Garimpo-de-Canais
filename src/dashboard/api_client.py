@@ -165,5 +165,10 @@ def config_de_alertas() -> dict:
     return _requisitar("GET", "/alertas/config")
 
 
+def listar_coletas(limit: int = 20) -> list[dict]:
+    """Últimas rodadas de coleta — mostra se os jobs estão mesmo rodando."""
+    return _requisitar("GET", "/coletas", params={"limit": limit})
+
+
 def health() -> dict:
     return _requisitar("GET", "/health")

@@ -321,6 +321,7 @@ SEGUNDOS_DE_CACHE = 120
 
 LEITURAS_CACHEAVEIS = {
     "ranking_de_nichos",
+    "listar_coletas",
     "listar_canais",
     "detalhar_canal",
     "historico_canal",
@@ -434,6 +435,52 @@ def selecionar_canal(itens: list[dict], chave: str) -> int | None:
 # --- Tela 1 -----------------------------------------------------------------
 
 
+ROTULO_JOB = {
+    "discovery": "Descoberta de canais",
+    "discovery_manual": "Busca manual",
+    "snapshot": "Snapshot diário",
+}
+
+
+def _estado_da_coleta() -> None:
+    """Diz se a coleta automática está saudável, direto na primeira tela.
+
+    Antes disto nada no sistema expunha `collection_runs`: uma descoberta que
+    passasse a falhar (cota estourada, chave do YouTube expirada) apareceria
+    apenas como "os dados pararam de atualizar", sem lugar nenhum dizendo o
+    motivo — só indo olhar o log da hospedagem.
+    """
+    coletas = carregar(api_client.listar_coletas, limit=20)
+    if not coletas:
+        return
+
+    ultima = coletas[0]
+    quando = (ultima["started_at"] or "")[:16].replace("T", " ")
+    rotulo = ROTULO_JOB.get(ultima["job_type"], ultima["job_type"])
+
+    falhas = [c for c in coletas if c["status"] == "failed"]
+    if ultima["status"] == "failed":
+        st.error(
+            f"**A última coleta falhou** ({rotulo}, {quando}): "
+            f"{ultima['error_message'] or 'sem detalhe registrado'}. "
+            "Enquanto isso não for resolvido os dados param de atualizar."
+        )
+    elif ultima["status"] == "partial":
+        st.warning(
+            f"A última coleta parou no meio ({rotulo}, {quando}): "
+            f"{ultima['error_message'] or 'cota da API esgotada'}. "
+            "O que já tinha sido coletado foi salvo."
+        )
+    else:
+        st.caption(
+            f"✅ Última coleta: {rotulo} em {quando} — "
+            f"{ultima['items_processed'] or 0} itens, "
+            f"{ultima['api_units_consumed'] or 0} unidades de cota."
+        )
+    if falhas and ultima["status"] != "failed":
+        st.caption(f"⚠️ {len(falhas)} das últimas {len(coletas)} coletas falharam.")
+
+
 def tela_visao_geral() -> None:
     page_header(
         "📡",
@@ -454,6 +501,8 @@ def tela_visao_geral() -> None:
     colunas[0].metric("Nichos monitorados", len(nichos))
     colunas[1].metric("Canais ativos", total_canais)
     colunas[2].metric("Novos esta semana", novos)
+
+    _estado_da_coleta()
 
     st.divider()
     eyebrow("Ranking")

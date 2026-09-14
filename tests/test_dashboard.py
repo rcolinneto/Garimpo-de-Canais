@@ -70,6 +70,16 @@ DETALHE = CANAL | {
     ],
 }
 
+COLETA_OK = {
+    "job_type": "snapshot",
+    "started_at": "2026-09-14T08:00:00+00:00",
+    "finished_at": "2026-09-14T08:02:00+00:00",
+    "status": "success",
+    "items_processed": 37,
+    "api_units_consumed": 42,
+    "error_message": None,
+}
+
 HISTORICO = {
     "channel_id": 1,
     "snapshots": [
@@ -111,10 +121,17 @@ def api_falsa(monkeypatch):
 
     _ler_da_api.clear()
     monkeypatch.setattr(settings, "dashboard_password", SENHA)
+    # health() é chamado pela thread de aquecimento que a landing dispara. Sem
+    # este mock cada teste solta uma thread fazendo rede de verdade, que fica
+    # até 150s tentando alcançar a API — elas se acumulam ao longo da suíte e
+    # ainda mexem no estado global de api_client, tornando testes lentos e
+    # dependentes de ordem.
+    monkeypatch.setattr(api_client, "health", lambda: {"status": "ok"})
     monkeypatch.setattr(
         api_client, "listar_canais", lambda **kwargs: {"total": 1, "limit": 50, "offset": 0, "items": [CANAL]}
     )
     monkeypatch.setattr(api_client, "ranking_de_nichos", lambda: [NICHO])
+    monkeypatch.setattr(api_client, "listar_coletas", lambda limit=20: [COLETA_OK])
     monkeypatch.setattr(api_client, "detalhar_canal", lambda channel_id: DETALHE)
     monkeypatch.setattr(api_client, "historico_canal", lambda channel_id, days=None: HISTORICO)
     monkeypatch.setattr(
@@ -563,3 +580,30 @@ def test_alerta_nao_avisa_quando_o_limiar_e_alcancavel(monkeypatch):
     assert not app.exception
     avisos = " ".join(bloco.value for bloco in app.warning)
     assert "Nenhum alerta pode disparar" not in avisos
+
+
+def test_visao_geral_mostra_que_a_coleta_esta_saudavel():
+    app = rodar_tela("tela_visao_geral")
+
+    assert not app.exception
+    legendas = " ".join(bloco.value for bloco in app.caption)
+    assert "Última coleta" in legendas
+    assert "37 itens" in legendas
+
+
+def test_visao_geral_denuncia_coleta_que_falhou(monkeypatch):
+    """Antes disto, um job quebrado só aparecia como "os dados não atualizam"."""
+    monkeypatch.setattr(
+        api_client,
+        "listar_coletas",
+        lambda limit=20: [
+            COLETA_OK | {"status": "failed", "error_message": "cota esgotada", "job_type": "discovery"}
+        ],
+    )
+
+    app = rodar_tela("tela_visao_geral")
+
+    assert not app.exception
+    erros = " ".join(bloco.value for bloco in app.error)
+    assert "A última coleta falhou" in erros
+    assert "cota esgotada" in erros

@@ -13,6 +13,7 @@ from src.api.schemas import (
     BuscaAgoraResposta,
     CanalDetalhe,
     CanalItem,
+    ExecucaoDeColeta,
     HistoricoCanal,
     ListaCanais,
     NichoCreate,
@@ -307,6 +308,14 @@ def buscar_nicho_agora(niche_id: int, session=Depends(get_session)) -> BuscaAgor
     if nicho is None:
         raise HTTPException(status_code=404, detail="Nicho não encontrado")
 
+    # Copiados agora, antes de qualquer coisa poder falhar: se a busca estourar,
+    # a sessão pode ficar num estado em que ler `nicho.name` dispara um refresh
+    # e levanta de novo — fora do try, virando um 500 genérico que esconde o
+    # erro de verdade. Aconteceu em produção: a tela recebia "Internal Server
+    # Error" em vez da mensagem explicando o que falhou.
+    nome_do_nicho = nicho.name
+    id_do_nicho = nicho.id
+
     started_at = datetime.now(timezone.utc)
     status_execucao = "success"
     error_message = None
@@ -350,14 +359,14 @@ def buscar_nicho_agora(niche_id: int, session=Depends(get_session)) -> BuscaAgor
 
     logger.info(
         "Busca sob demanda do nicho '%s' (%s): %d canais novos, %d unidades",
-        nicho.name,
+        nome_do_nicho,
         status_execucao,
         len(novos),
         units,
     )
     return BuscaAgoraResposta(
-        niche_id=nicho.id,
-        niche_name=nicho.name,
+        niche_id=id_do_nicho,
+        niche_name=nome_do_nicho,
         status=status_execucao,
         canais_novos=len(novos),
         api_units_consumed=units,
@@ -392,6 +401,30 @@ def configuracao_de_alertas() -> AlertaConfig:
         email_configurado=smtp_configurado(),
         destinatarios=destinatarios(),
     )
+
+
+@app.get("/coletas", response_model=list[ExecucaoDeColeta])
+def listar_coletas(
+    limit: int = Query(20, ge=1, le=100), session=Depends(get_session)
+) -> list[ExecucaoDeColeta]:
+    """Últimas rodadas de coleta, para saber se os jobs estão de fato rodando.
+
+    Sem isto, uma descoberta que passou a falhar (cota estourada, chave do
+    YouTube expirada) só apareceria como "os dados pararam de atualizar", sem
+    nenhum lugar no sistema dizendo o motivo.
+    """
+    return [
+        ExecucaoDeColeta(
+            job_type=row.job_type,
+            started_at=row.started_at,
+            finished_at=row.finished_at,
+            status=row.status,
+            items_processed=row.items_processed,
+            api_units_consumed=row.api_units_consumed,
+            error_message=row.error_message,
+        )
+        for row in queries.collection_runs(session, limit)
+    ]
 
 
 def _normalizar_keywords(keywords: list[str]) -> list[str]:

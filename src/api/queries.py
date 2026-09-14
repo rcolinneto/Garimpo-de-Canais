@@ -13,6 +13,7 @@ from src.config.settings import settings
 from src.db.models import (
     AlertSent,
     Channel,
+    CollectionRun,
     ChannelScore,
     ChannelSnapshot,
     MonetizationSignal,
@@ -285,4 +286,21 @@ def niche_history(session, niche_id: int, days: int = 90) -> list:
         )
         .group_by(dia)
         .order_by(dia)
+    ).all()
+
+
+def collection_runs(session, limit: int = 20):
+    """Últimas rodadas de coleta, da mais recente para a mais antiga."""
+    return session.execute(
+        select(
+            CollectionRun.job_type,
+            CollectionRun.started_at,
+            CollectionRun.finished_at,
+            CollectionRun.status,
+            CollectionRun.items_processed,
+            CollectionRun.api_units_consumed,
+            CollectionRun.error_message,
+        )
+        .order_by(CollectionRun.started_at.desc())
+        .limit(limit)
     ).all()

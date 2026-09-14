@@ -158,3 +158,20 @@ class NichoResposta(BaseModel):
     active: bool
     created_at: datetime
     last_discovery_at: datetime | None = None
+
+
+class ExecucaoDeColeta(BaseModel):
+    """Resultado de uma rodada de coleta (`collection_runs`).
+
+    Existe porque até então nada expunha esse registro: se a descoberta
+    noturna começasse a falhar — cota estourada, chave do YouTube expirada —
+    os dados apenas parariam de atualizar, sem nada na tela dizendo por quê.
+    """
+
+    job_type: str
+    started_at: datetime
+    finished_at: datetime | None
+    status: str
+    items_processed: int | None
+    api_units_consumed: int | None
+    error_message: str | None

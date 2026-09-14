@@ -22,6 +22,7 @@ from src.db.models import (
     Channel,
     ChannelScore,
     ChannelSnapshot,
+    CollectionRun,
     MonetizationSignal,
     Niche,
 )
@@ -654,3 +655,41 @@ def test_filtro_sem_nicho_isola_os_canais_da_coleta_de_alta(api):
     # E o inverso continua valendo: filtrar por um nicho não traz o sem nicho.
     de_um_nicho = client.get("/canais", params={"niche_id": ids["nicho_financas"]}).json()
     assert all(item["niche_id"] == ids["nicho_financas"] for item in de_um_nicho["items"])
+
+
+def test_coletas_expoe_o_estado_dos_jobs(api):
+    """Sem este endpoint, um job que passa a falhar só aparece como "os dados
+    pararam de atualizar", sem nada no sistema dizendo o motivo."""
+    client, _ = api
+    session = app.dependency_overrides[get_session]()
+    session.add_all(
+        [
+            CollectionRun(
+                job_type="discovery",
+                started_at=AGORA - timedelta(hours=5),
+                finished_at=AGORA - timedelta(hours=5),
+                status="failed",
+                items_processed=0,
+                api_units_consumed=0,
+                error_message="cota esgotada",
+            ),
+            CollectionRun(
+                job_type="snapshot",
+                started_at=AGORA - timedelta(hours=1),
+                finished_at=AGORA - timedelta(hours=1),
+                status="success",
+                items_processed=37,
+                api_units_consumed=42,
+            ),
+        ]
+    )
+    session.flush()
+
+    coletas = client.get("/coletas").json()
+
+    # Mais recente primeiro
+    assert coletas[0]["job_type"] == "snapshot"
+    assert coletas[0]["status"] == "success"
+    assert coletas[0]["items_processed"] == 37
+    assert coletas[1]["status"] == "failed"
+    assert coletas[1]["error_message"] == "cota esgotada"
