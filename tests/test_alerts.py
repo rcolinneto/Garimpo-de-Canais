@@ -12,6 +12,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
+
+from tests.conftest import erro_de_conexao
 from sqlalchemy.orm import sessionmaker
 
 from src.config.settings import settings
@@ -138,11 +140,10 @@ def test_aviso_de_falha_nunca_propaga_erro(monkeypatch):
 
 @pytest.fixture()
 def sessao():
-    try:
-        engine = create_engine(DATABASE_URL)
-        connection = engine.connect()
-    except Exception as erro:  # noqa: BLE001
-        pytest.skip(f"Postgres indisponível para testes de integração: {erro}")
+    falha = erro_de_conexao(DATABASE_URL)
+    if falha:
+        pytest.skip(f"Postgres indisponível para testes de integração: {falha}")
+    connection = create_engine(DATABASE_URL).connect()
 
     transaction = connection.begin()
     sessao = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")()

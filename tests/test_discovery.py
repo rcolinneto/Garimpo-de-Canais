@@ -10,6 +10,8 @@ import os
 
 import pytest
 from sqlalchemy import create_engine
+
+from tests.conftest import erro_de_conexao
 from sqlalchemy.orm import sessionmaker
 
 from src.collectors.models import ChannelRef
@@ -24,11 +26,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localh
 
 @pytest.fixture()
 def sessao():
-    try:
-        engine = create_engine(DATABASE_URL)
-        connection = engine.connect()
-    except Exception as erro:  # noqa: BLE001
-        pytest.skip(f"Postgres indisponível para testes de integração: {erro}")
+    falha = erro_de_conexao(DATABASE_URL)
+    if falha:
+        pytest.skip(f"Postgres indisponível para testes de integração: {falha}")
+    connection = create_engine(DATABASE_URL).connect()
 
     transaction = connection.begin()
     sessao = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")()

@@ -25,6 +25,7 @@ from src.db.models import (
     MonetizationSignal,
     Niche,
 )
+from tests.conftest import erro_de_conexao
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localhost:5433/garimpo")
 
@@ -171,11 +172,10 @@ def _seed(session) -> dict:
 
 @pytest.fixture()
 def api():
-    try:
-        engine = create_engine(DATABASE_URL)
-        connection = engine.connect()
-    except Exception as error:  # noqa: BLE001
-        pytest.skip(f"Postgres indisponível para testes de integração: {error}")
+    falha = erro_de_conexao(DATABASE_URL)
+    if falha:
+        pytest.skip(f"Postgres indisponível para testes de integração: {falha}")
+    connection = create_engine(DATABASE_URL).connect()
 
     transaction = connection.begin()
     # create_savepoint: os endpoints de escrita chamam commit(), e sem isso o
@@ -355,10 +355,9 @@ def banco_do_endpoint_alcancavel():
     e a suíte parece quebrada quando só falta rodar com a URL certa:
         DATABASE_URL=postgresql://garimpo:...@localhost:5433/garimpo pytest
     """
-    try:
-        create_engine(settings.database_url).connect().close()
-    except Exception as error:  # noqa: BLE001
-        pytest.skip(f"Banco de settings.database_url indisponível: {error}")
+    falha = erro_de_conexao(settings.database_url)
+    if falha:
+        pytest.skip(f"Banco de settings.database_url indisponível: {falha}")
 
 
 def _limpar_logs_de_busca_manual(desde):
