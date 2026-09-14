@@ -622,3 +622,35 @@ def test_edicao_com_payload_invalido(api):
     resposta = client.put(f"/nichos/{ids['nicho_pets']}", json={"active": "talvez"})
 
     assert resposta.status_code == 422
+
+
+def test_filtro_sem_nicho_isola_os_canais_da_coleta_de_alta(api):
+    """A coleta de "vídeos em alta" cadastra canais sem nicho (docs/04). Em
+    produção eles chegaram a ser 68% da lista, misturados com o nicho
+    monitorado — poder isolá-los é o que separa uma coisa da outra."""
+    client, ids = api
+    # A base de teste não tem canal sem nicho; sem criar um aqui o filtro
+    # devolveria lista vazia e o teste passaria sem testar nada.
+    session = app.dependency_overrides[get_session]()
+    orfao = Channel(
+        youtube_channel_id="UC_teste_sem_nicho",
+        display_name="Canal De Alta",
+        niche_id=None,
+        discovered_at=AGORA - timedelta(days=1),
+        status="active",
+    )
+    session.add(orfao)
+    session.flush()
+    # Sem snapshot o canal não entra na listagem (a query faz join com o último).
+    session.add(ChannelSnapshot(channel_id=orfao.id, collected_at=AGORA, subscriber_count=800))
+    session.flush()
+
+    todos = client.get("/canais").json()
+    sem_nicho = client.get("/canais", params={"sem_nicho": True}).json()
+
+    assert sem_nicho["total"] == 1
+    assert todos["total"] > sem_nicho["total"]
+    assert [item["display_name"] for item in sem_nicho["items"]] == ["Canal De Alta"]
+    # E o inverso continua valendo: filtrar por um nicho não traz o sem nicho.
+    de_um_nicho = client.get("/canais", params={"niche_id": ids["nicho_financas"]}).json()
+    assert all(item["niche_id"] == ids["nicho_financas"] for item in de_um_nicho["items"])

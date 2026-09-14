@@ -105,6 +105,11 @@ HISTORICO = {
 @pytest.fixture(autouse=True)
 def api_falsa(monkeypatch):
     """Respostas fixas no lugar da API, para o teste não depender dela no ar."""
+    # O cache de leitura é global e sobrevive entre testes; sem limpar, um teste
+    # receberia a resposta falsa montada por outro.
+    from src.dashboard.app import _ler_da_api
+
+    _ler_da_api.clear()
     monkeypatch.setattr(settings, "dashboard_password", SENHA)
     monkeypatch.setattr(
         api_client, "listar_canais", lambda **kwargs: {"total": 1, "limit": 50, "offset": 0, "items": [CANAL]}
@@ -449,3 +454,112 @@ def test_aquecimento_da_api_dispara_uma_vez_e_nao_derruba_a_tela(monkeypatch):
     assert not app.exception
     # Duas invocações, mas só um aquecimento: o flag de sessão evita repetir.
     assert len(chamadas) == 1
+
+
+def test_leitura_repetida_usa_cache_em_vez_de_bater_na_api(monkeypatch):
+    """Sem cache, cada clique num filtro refaz todas as chamadas à API."""
+    from src.dashboard.app import _ler_da_api, carregar
+
+    _ler_da_api.clear()
+    chamadas = []
+    monkeypatch.setattr(
+        api_client, "ranking_de_nichos", lambda: chamadas.append(1) or [NICHO]
+    )
+
+    app = AppTest.from_string(
+        "from src.dashboard import api_client\n"
+        "from src.dashboard.app import carregar\n"
+        "carregar(api_client.ranking_de_nichos)\n"
+        "carregar(api_client.ranking_de_nichos)\n"
+        "carregar(api_client.ranking_de_nichos)\n",
+        default_timeout=30,
+    ).run()
+
+    assert not app.exception
+    assert len(chamadas) == 1, "três leituras iguais devem virar uma chamada só"
+
+
+def test_escrita_invalida_o_cache(monkeypatch):
+    """Um nicho recém-criado precisa aparecer na lista na hora."""
+    from src.dashboard.app import _ler_da_api
+
+    _ler_da_api.clear()
+    chamadas = []
+    monkeypatch.setattr(
+        api_client, "ranking_de_nichos", lambda: chamadas.append(1) or [NICHO]
+    )
+    monkeypatch.setattr(api_client, "criar_nicho", lambda **kwargs: {"niche_id": 9})
+
+    app = AppTest.from_string(
+        "from src.dashboard import api_client\n"
+        "from src.dashboard.app import carregar\n"
+        "carregar(api_client.ranking_de_nichos)\n"
+        "carregar(api_client.criar_nicho, name='novo', keywords=['x'])\n"
+        "carregar(api_client.ranking_de_nichos)\n",
+        default_timeout=30,
+    ).run()
+
+    assert not app.exception
+    assert len(chamadas) == 2, "a leitura após a escrita não pode vir do cache"
+
+
+def test_cache_diferencia_filtros_com_lista(monkeypatch):
+    """Filtro de sinais é uma lista — o cache precisa aceitar e diferenciar."""
+    from src.dashboard.app import _ler_da_api
+
+    _ler_da_api.clear()
+    recebidos = []
+
+    def _listar(**kwargs):
+        recebidos.append(kwargs.get("signal_types"))
+        return {"total": 0, "limit": 50, "offset": 0, "items": []}
+
+    monkeypatch.setattr(api_client, "listar_canais", _listar)
+
+    app = AppTest.from_string(
+        "from src.dashboard import api_client\n"
+        "from src.dashboard.app import carregar\n"
+        "carregar(api_client.listar_canais, signal_types=['link_afiliado'])\n"
+        "carregar(api_client.listar_canais, signal_types=['link_afiliado'])\n"
+        "carregar(api_client.listar_canais, signal_types=['loja_propria'])\n",
+        default_timeout=30,
+    ).run()
+
+    assert not app.exception
+    assert recebidos == [["link_afiliado"], ["loja_propria"]]
+
+
+def test_alerta_avisa_quando_o_limiar_e_inalcancavel(monkeypatch):
+    """Achado em produção: limiar 50 com maior score real 5,98 — o alerta ficava
+    ligado e mudo para sempre, sem nada na tela explicando por quê."""
+    monkeypatch.setattr(
+        api_client,
+        "listar_canais",
+        lambda **kwargs: {
+            "total": 1,
+            "limit": 50,
+            "offset": 0,
+            "items": [] if kwargs.get("min_score") else [CANAL | {"total_score": 5.98}],
+        },
+    )
+
+    app = rodar_tela("tela_alertas")
+
+    assert not app.exception
+    avisos = " ".join(bloco.value for bloco in app.warning)
+    assert "Nenhum alerta pode disparar" in avisos
+    assert "5.98" in avisos
+
+
+def test_alerta_nao_avisa_quando_o_limiar_e_alcancavel(monkeypatch):
+    monkeypatch.setattr(
+        api_client,
+        "config_de_alertas",
+        lambda: {"limiar": 5.0, "email_configurado": True, "destinatarios": ["chefe@exemplo.com"]},
+    )
+
+    app = rodar_tela("tela_alertas")
+
+    assert not app.exception
+    avisos = " ".join(bloco.value for bloco in app.warning)
+    assert "Nenhum alerta pode disparar" not in avisos

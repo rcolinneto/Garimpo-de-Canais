@@ -80,6 +80,7 @@ def _growth_expr(latest, baseline):
 
 def build_channels_query(
     niche_id: int | None = None,
+    sem_nicho: bool = False,
     min_subscribers: int | None = None,
     max_subscribers: int | None = None,
     min_growth: float | None = None,
@@ -133,7 +134,13 @@ def build_channels_query(
 
     if status:
         stmt = stmt.where(Channel.status == status)
-    if niche_id is not None:
+    if sem_nicho:
+        # Canais vindos da coleta de "vídeos em alta" (docs/04) entram sem nicho
+        # atribuído, porque não nasceram da busca por palavras-chave de nenhum.
+        # Poder isolá-los é o que separa a lista de trabalho do nicho monitorado
+        # do resto que o sistema encontrou por conta própria.
+        stmt = stmt.where(Channel.niche_id.is_(None))
+    elif niche_id is not None:
         stmt = stmt.where(Channel.niche_id == niche_id)
     if min_subscribers is not None:
         stmt = stmt.where(latest.c.subscriber_count >= min_subscribers)

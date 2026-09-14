@@ -160,6 +160,9 @@ def _canal_base(row, sinais: list[str]) -> dict:
 @app.get("/canais", response_model=ListaCanais)
 def listar_canais(
     niche_id: int | None = None,
+    sem_nicho: bool = Query(
+        False, description="Só canais sem nicho atribuído (vindos da coleta de vídeos em alta)"
+    ),
     min_subscribers: int | None = None,
     max_subscribers: int | None = None,
     min_growth: float | None = Query(None, description="Crescimento mínimo de inscritos em 7 dias (%)"),
@@ -178,6 +181,7 @@ def listar_canais(
     """Tela 2 — canais descobertos, ordenados por total_score decrescente."""
     stmt = queries.build_channels_query(
         niche_id=niche_id,
+        sem_nicho=sem_nicho,
         min_subscribers=min_subscribers,
         max_subscribers=max_subscribers,
         min_growth=min_growth,

@@ -93,6 +93,10 @@ def rotulo_sinal(slug: str) -> str:
     return SIGNAL_LABELS.get(slug, slug)
 
 
+# Opção do filtro de nicho da Tela 2 para os canais que a coleta de "vídeos em
+# alta" (docs/04) cadastra sem nicho, por não virem da busca por palavras-chave.
+OPCAO_SEM_NICHO = "Sem nicho (vídeos em alta)"
+
 # Paleta dos gráficos — consistente com a marca, no lugar do azul padrão do
 # Vega-Lite. Usada na ordem: principal, acento, e dois tons de apoio para
 # quando um gráfico tem vários componentes (ex.: score total + seus 3 fatores).
@@ -308,6 +312,62 @@ def autenticar() -> bool:
 # --- helpers ----------------------------------------------------------------
 
 
+# O Streamlit reexecuta o script inteiro a cada clique, então sem cache mexer
+# num filtro refaz todas as chamadas à API — na "Canais Descobertos" são duas
+# por clique, e cada uma é uma ida à rede. Os dados só mudam quando a coleta
+# roda (uma vez por dia), então um TTL curto deixa a tela instantânea sem risco
+# de mostrar coisa velha. Escritas limpam o cache na hora (ver ESCRITAS).
+SEGUNDOS_DE_CACHE = 120
+
+LEITURAS_CACHEAVEIS = {
+    "ranking_de_nichos",
+    "listar_canais",
+    "detalhar_canal",
+    "historico_canal",
+    "historico_do_nicho",
+    "listar_alertas",
+    "config_de_alertas",
+}
+
+# Depois destas o cache precisa cair, senão a tela continua mostrando o estado
+# anterior — um nicho recém-criado que não aparece na lista, por exemplo.
+ESCRITAS = {"criar_nicho", "atualizar_nicho", "buscar_nicho_agora"}
+
+
+@st.cache_data(ttl=SEGUNDOS_DE_CACHE, show_spinner=False)
+def _ler_da_api(nome: str, args: tuple, kwargs_em_tuplas: tuple):
+    """Leitura memorizada. Recebe tudo em tupla porque o cache do Streamlit
+    exige argumentos hashable; as listas de filtro voltam a ser lista aqui."""
+    kwargs = {
+        chave: list(valor) if isinstance(valor, tuple) else valor
+        for chave, valor in kwargs_em_tuplas
+    }
+    return getattr(api_client, nome)(*args, **kwargs)
+
+
+def _em_tuplas(kwargs: dict) -> tuple:
+    return tuple(
+        sorted(
+            (chave, tuple(valor) if isinstance(valor, list) else valor)
+            for chave, valor in kwargs.items()
+        )
+    )
+
+
+def _nome_no_api_client(funcao) -> str | None:
+    """Descobre por qual nome esta função está exposta no api_client.
+
+    Por identidade, e não por `funcao.__name__`: o nome do atributo é o que
+    identifica a chamada, e um objeto substituído (um teste trocando a função
+    por outra) continua sendo encontrado — com `__name__` ele viraria
+    "<lambda>" e o cache seria silenciosamente ignorado.
+    """
+    for nome, alvo in vars(api_client).items():
+        if alvo is funcao:
+            return nome
+    return None
+
+
 def carregar(funcao, *args, **kwargs):
     """Executa uma chamada de API mostrando o erro na tela em vez de estourar."""
     try:
@@ -319,7 +379,13 @@ def carregar(funcao, *args, **kwargs):
             "Carregando dados… se o servidor estiver ocioso, a primeira "
             "abertura pode levar até 1 minuto enquanto ele acorda."
         ):
-            return funcao(*args, **kwargs)
+            nome = _nome_no_api_client(funcao)
+            if nome in LEITURAS_CACHEAVEIS:
+                return _ler_da_api(nome, args, _em_tuplas(kwargs))
+            resultado = funcao(*args, **kwargs)
+            if nome in ESCRITAS:
+                _ler_da_api.clear()
+            return resultado
     except ApiError as erro:
         st.error(str(erro))
         return None
@@ -442,7 +508,15 @@ def tela_canais() -> None:
     )
 
     nichos = carregar(api_client.ranking_de_nichos) or []
-    opcoes_nicho = {"Todos": None} | {nicho["name"]: nicho["niche_id"] for nicho in nichos}
+    opcoes_nicho = (
+        {"Todos": None}
+        | {nicho["name"]: nicho["niche_id"] for nicho in nichos}
+        # A coleta de "vídeos em alta" (docs/04) cadastra canais sem nicho, por
+        # não virem da busca por palavras-chave de nenhum. Sem esta opção eles
+        # ficam misturados na lista e não dá para separar o que veio do nicho
+        # monitorado do que o sistema achou sozinho.
+        | {OPCAO_SEM_NICHO: None}
+    )
 
     with st.expander("🛰️ Buscar novos canais agora no YouTube"):
         st.caption(
@@ -524,6 +598,7 @@ def tela_canais() -> None:
     dados = carregar(
         api_client.listar_canais,
         niche_id=opcoes_nicho[nicho],
+        sem_nicho=True if nicho == OPCAO_SEM_NICHO else None,
         min_subscribers=minimo_inscritos or None,
         max_subscribers=maximo_inscritos or None,
         min_growth=crescimento or None,
@@ -811,6 +886,21 @@ def tela_alertas() -> None:
         "O limiar vigente vem da variável de ambiente ALERT_SCORE_THRESHOLD. "
         "Use o campo abaixo para simular outro valor antes de alterá-la."
     )
+
+    # A escala do score é 0-100, mas na prática os valores se concentram bem
+    # embaixo (dependem de crescimento percentual entre snapshots). Um limiar
+    # acima do teto real deixa o alerta ligado e mudo para sempre, sem nada na
+    # tela explicando por quê — este aviso torna isso visível.
+    topo = carregar(api_client.listar_canais, limit=1)
+    maior_score = topo["items"][0]["total_score"] if topo and topo["items"] else None
+    if maior_score is not None and limiar_vigente > maior_score:
+        st.warning(
+            f"**Nenhum alerta pode disparar com a configuração atual.** O limiar é "
+            f"{_arredondar(limiar_vigente)}, mas o maior score entre os canais "
+            f"monitorados hoje é {_arredondar(maior_score)} — nenhum canal chega perto. "
+            "Use a simulação abaixo para achar um valor que selecione os canais certos "
+            "e então ajuste ALERT_SCORE_THRESHOLD para ele."
+        )
 
     limiar = st.number_input(
         "Simular limiar",
