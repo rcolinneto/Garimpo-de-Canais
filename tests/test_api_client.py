@@ -6,6 +6,7 @@ uma página HTML de erro (502/503/504) em vez de JSON, o cliente não pode
 repassar esse HTML cru para a tela — só a mensagem amigável.
 """
 
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -25,6 +26,19 @@ def _resposta_html_de_erro(status_code: int) -> SimpleNamespace:
         raise ValueError("não é JSON")
 
     return SimpleNamespace(status_code=status_code, json=_json, text=corpo_html)
+
+
+@pytest.fixture(autouse=True)
+def sem_memoria_de_desistencia():
+    """Zera o estado de módulo entre os testes.
+
+    `_ultima_desistencia` é global de propósito (a API estar fora do ar é um
+    fato do sistema, não de uma sessão), mas sem isto uma desistência de um
+    teste faria o seguinte falhar na hora e o resultado dependeria da ordem.
+    """
+    api_client._ultima_desistencia = None
+    yield
+    api_client._ultima_desistencia = None
 
 
 @pytest.fixture
@@ -111,3 +125,47 @@ def test_erro_de_negocio_nao_fica_repetindo(monkeypatch, sem_espera):
     with pytest.raises(ApiError, match="Canal não encontrado"):
         api_client.detalhar_canal(1)
     assert len(chamadas) == 1
+
+
+def test_janela_de_espera_e_por_tela_nao_por_requisicao(monkeypatch):
+    """O bug que travava a tela: cada chamada esperava a janela inteira.
+
+    Uma tela faz várias chamadas em sequência. Medido com a API fora do ar, a
+    "Visão Geral" levava 314s e a "Detalhe do Canal" 471s — tela parada. Depois
+    que uma chamada desiste, as seguintes têm de falhar na hora.
+    """
+    monkeypatch.setattr(api_client, "ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS", 0.3)
+    monkeypatch.setattr(api_client, "INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS", 0.05)
+    monkeypatch.setattr(
+        api_client.requests,
+        "request",
+        lambda *a, **k: (_ for _ in ()).throw(api_client.requests.ConnectionError("recusada")),
+    )
+
+    inicio = time.monotonic()
+    with pytest.raises(ApiError):
+        api_client.ranking_de_nichos()
+    esperou = time.monotonic() - inicio
+
+    inicio_segunda = time.monotonic()
+    with pytest.raises(ApiError):
+        api_client.listar_canais()
+    segunda = time.monotonic() - inicio_segunda
+
+    assert esperou >= 0.3, "a primeira chamada deve esperar a API acordar"
+    assert segunda < esperou / 2, "a segunda não pode repetir a espera inteira"
+
+
+def test_resposta_da_api_limpa_a_memoria_de_desistencia(monkeypatch):
+    """Uma indisponibilidade passada não pode penalizar as telas seguintes."""
+    monkeypatch.setattr(api_client, "INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS", 0)
+    api_client._ultima_desistencia = time.monotonic()
+
+    monkeypatch.setattr(
+        api_client.requests,
+        "request",
+        lambda *a, **k: SimpleNamespace(status_code=200, json=lambda: {"status": "ok"}, text=""),
+    )
+
+    assert api_client.health() == {"status": "ok"}
+    assert api_client._ultima_desistencia is None

@@ -12,7 +12,11 @@ import requests
 
 from src.config.settings import settings
 
-TIMEOUT_SEGUNDOS = 30
+# 60s e não 30s: quando o serviço está subindo, a hospedagem segura a conexão
+# aberta até o contêiner responder. Medido no Render, isso passou de 31s — com
+# timeout de 30s a tentativa morria justo antes da resposta chegar, jogando
+# fora o tempo que já tinha esperado.
+TIMEOUT_SEGUNDOS = 60
 # A busca sob demanda é síncrona e chama a API do YouTube na hora — pode levar
 # bem mais que o timeout padrão para um nicho com muitos candidatos.
 TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
@@ -30,6 +34,16 @@ TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
 ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS = 150
 INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS = 5
 STATUS_API_ACORDANDO = (502, 503, 504)
+
+# A janela acima vale por TELA, não por requisição. Cada tela faz várias
+# chamadas (a "Visão Geral" faz 2, a "Detalhe do Canal" faz 3), e sem isto a
+# espera se multiplica: medido com a API fora do ar, a "Visão Geral" levava
+# 314s — 150s em cada chamada, em sequência — o que na prática é uma tela
+# travada para sempre. Depois que uma chamada desiste, as seguintes falham na
+# hora por este período, então a tela termina de renderizar e mostra o erro.
+# Qualquer resposta da API zera esta memória.
+MEMORIA_DE_DESISTENCIA_SEGUNDOS = 30
+_ultima_desistencia: float | None = None
 
 
 class ApiError(RuntimeError):
@@ -67,8 +81,21 @@ def _tratar(resposta: requests.Response) -> Any:
     return resposta.json()
 
 
+def _desistiu_ha_pouco() -> bool:
+    return (
+        _ultima_desistencia is not None
+        and time.monotonic() - _ultima_desistencia < MEMORIA_DE_DESISTENCIA_SEGUNDOS
+    )
+
+
 def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwargs) -> Any:
-    limite = time.monotonic() + ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS
+    global _ultima_desistencia
+
+    # Se a chamada anterior já esperou a janela inteira e a API não voltou, não
+    # adianta esta esperar tudo de novo: falha na hora para a tela conseguir
+    # renderizar e mostrar o erro.
+    espera = 0.0 if _desistiu_ha_pouco() else ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS
+    limite = time.monotonic() + espera
     while True:
         # Só vale insistir enquanto a janela de espera não estourou; passado
         # isso, o próximo resultado é o definitivo (vira erro na tela).
@@ -77,11 +104,17 @@ def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwa
             resposta = requests.request(metodo, _url(path), timeout=timeout, **kwargs)
         except requests.RequestException as erro:
             if not insistir:
+                _ultima_desistencia = time.monotonic()
                 raise ApiError(
                     f"Não foi possível falar com a API ({settings.api_base_url}): {erro}"
                 ) from erro
         else:
             if resposta.status_code not in STATUS_API_ACORDANDO or not insistir:
+                # A API respondeu: esquece qualquer desistência anterior, senão
+                # uma indisponibilidade passada penalizaria as telas seguintes.
+                _ultima_desistencia = (
+                    time.monotonic() if resposta.status_code in STATUS_API_ACORDANDO else None
+                )
                 return _tratar(resposta)
         time.sleep(INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS)
 
