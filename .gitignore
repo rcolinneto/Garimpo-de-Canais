@@ -7,3 +7,6 @@ venv/
 dist/
 build/
 .pytest_cache/
+
+# Segredos do Streamlit Community Cloud (nunca commitar)
+.streamlit/secrets.toml
