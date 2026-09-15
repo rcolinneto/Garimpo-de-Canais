@@ -1,0 +1,17 @@
+# Dependências do DASHBOARD, para o Streamlit Community Cloud.
+#
+# A lista completa do projeto está no pyproject.toml — este arquivo existe por
+# dois motivos:
+#
+# 1. O Community Cloud só entende `pyproject.toml` no formato do Poetry, e o
+#    nosso é PEP 621 com hatchling.
+# 2. Lá roda só o dashboard (a API continua no Render), então instalar driver
+#    de Postgres, cliente do YouTube, Alembic e APScheduler seria desperdício
+#    de build e de memória.
+#
+# Ao mexer nas dependências do dashboard, lembrar de refletir aqui.
+streamlit>=1.39
+pandas>=2.2
+requests>=2.32
+pydantic>=2.9
+pydantic-settings>=2.5
