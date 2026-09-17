@@ -59,6 +59,11 @@ Cada brecha mostra, em uma linha expansível:
 - **A prova de espaço livre** — os resultados encontrados naquele idioma são antigos? de canais pequenos? É a resposta à pergunta 2 das 4, com os dados que a sustentam.
 - **O que falta validar manualmente** — a pergunta 4 ("o assunto faz sentido nesse país?") aparece como pendência explícita, com campo de anotação. O sistema não a responde.
 
-Ações disponíveis: mover o status entre `mapeada`, `validada`, `ocupada` e `descartada`. Só uma pessoa move — o sistema cria como `mapeada` e no máximo sugere `validada`.
+Ações disponíveis: mover o status entre `mapeada`, `validada`, `ocupada` e `descartada`. **Quem move é o chefe, direto** — decidido em `00b`, sem curadoria prévia. O sistema cria como `mapeada` e no máximo sugere `validada`.
+
+Isso torna a **ordenação crítica**. Sem filtro humano antes, o `opportunity_score` é o que separa o que ele olha primeiro do que ele nunca vai rolar a página para ver — e uma candidata fraca no topo custa a confiança na tela inteira. Por isso:
+
+- A tela nasce **ordenada por score**, com um corte configurável, não como lista crua.
+- O rodapé mostra **quantas candidatas ficaram abaixo do corte**, com a opção de exibi-las. Esconder ruído sem dizer que existe seria enganoso — mesma regra de honestidade que vale para o resto do sistema.
 
 **Regra que vale aqui igual às outras telas**: nenhuma brecha aparece sem a evidência que a sustenta. Um número de oportunidade sem a prova ao lado seria um palpite com aparência de dado.

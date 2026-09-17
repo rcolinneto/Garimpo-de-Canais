@@ -144,6 +144,9 @@ Países/idiomas candidatos a receber um formato validado. Cadastrado e mantido m
 | rpm_estimado | numeric | **estimativa de mercado**, não dado da API — revisar periodicamente |
 | falantes_estimados | bigint | contrapeso do RPM: CPM alto com pouco alcance pode render menos |
 | active | boolean | permite pausar um mercado sem perder histórico |
+| last_validated_at | timestamptz | nullable — sustenta o rodízio de mercados por ciclo, mesmo papel de `niches.last_discovery_at` |
+
+Carteira inicial decidida em `00b` (mista, 4 países): `US`/`en`, `DE`/`de`, `IT`/`it`, `PL`/`pl`. Com uma chave de API só, cada ciclo valida **um** mercado, em rodízio — o mais antigo em `last_validated_at` primeiro.
 
 ## `opportunities`
 A brecha em si: o cruzamento de um formato validado com um ângulo e um mercado. É a entrega final da camada nova.

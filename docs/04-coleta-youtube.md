@@ -79,7 +79,8 @@ A conta que decide o desenho: validar uma brecha em 5 mercados por busca custa 5
 1. **Varredura barata primeiro.** `chart=mostPopular&regionCode=XX` custa 1 unidade e revela o que está em alta em cada país. Varrer 20 países custa 20 unidades — o mesmo que um quinto de uma única busca.
 2. **Vídeos por lote.** `videos.list` aceita até 50 IDs por chamada de 1 unidade. Atualizar 200 vídeos custa 4 unidades, não 200.
 3. **`search.list` só para confirmar.** Reservado para a brecha que já passou pelo funil, com orçamento por execução — o mecanismo `discovery_quota_budget` já existe e vale igual aqui.
-4. **Rotação de chaves.** O coletor já troca de chave ao estourar a cota de uma (`youtube_api_keys`). Operar em vários mercados provavelmente exige mais de uma chave.
+4. **Um mercado por ciclo, em rodízio.** Decidido em `00b`: manter uma única chave e validar **um** mercado por execução, pegando sempre o de `markets.last_validated_at` mais antigo. Com os 4 mercados da carteira inicial, cada um é revisitado a cada 4 ciclos — o que cabe na cota sem tirar espaço da descoberta por nicho e do snapshot.
+5. **Rotação de chaves fica disponível, não usada por ora.** O coletor já troca de chave ao estourar a cota de uma (`youtube_api_keys`). É a saída caso o rodízio se mostre lento demais na prática.
 
 ## Aviso operacional
 

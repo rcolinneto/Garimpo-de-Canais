@@ -87,7 +87,7 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 
 > Acrescentadas em 2026-09-17 pela rodada `00b-alinhamento-brecha-viral.md`. Entram **depois** da Fase 6, sem reabrir as anteriores: o radar continua rodando enquanto a camada nova é construída em cima dele.
 >
-> **Bloqueio antes da Fase 9**: a cota da API já estoura hoje (ver aviso em `04-coleta-youtube.md`). As perguntas em aberto de `00b` — quais mercados e quantas chaves — precisam de resposta do chefe antes de multiplicar buscas por país.
+> **Atenção antes da Fase 9**: a cota da API já estoura hoje (ver aviso em `04-coleta-youtube.md`). A decisão de `00b` foi manter **uma única chave** e rodar **um mercado por ciclo**, em rodízio — o desenho precisa caber nessa restrição, não contorná-la.
 
 ### Fase 7 — Vídeos como entidade e detecção de outlier
 
@@ -111,7 +111,7 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 
 **Objetivo**: os passos MAPEAR e VALIDAR — onde esse formato ainda não tem dono.
 
-**Entregáveis**: tabelas `markets` e `opportunities`; varredura barata por país via `chart=mostPopular&regionCode=XX` (1 unidade); `search.list` só para confirmar uma brecha específica, sob orçamento de cota; `opportunity_score`; **Tela 6 — Brechas**, com a lista de candidatas, a prova de cada uma e o campo de julgamento humano.
+**Entregáveis**: tabelas `markets` (semeada com a carteira de `00b`: US/en, DE/de, IT/it, PL/pl) e `opportunities`; **rodízio de um mercado por ciclo** via `last_validated_at`; varredura barata por país com `chart=mostPopular&regionCode=XX` (1 unidade); `search.list` só para confirmar uma brecha específica, sob orçamento de cota; `opportunity_score`; **Tela 6 — Brechas**, ordenada por score com corte configurável, a prova de cada candidata e o campo de anotação manual.
 
 **Prompt sugerido**:
 > Leia "Coleta para a camada de oportunidade" em `docs/04-coleta-youtube.md` e "Opportunity score" em `docs/05-motor-monetizacao-e-score.md`. Respeite a estratégia de custo: varredura barata primeiro, `search.list` só no fim. A 4ª das "4 perguntas" não entra na fórmula — ela é campo de anotação manual.

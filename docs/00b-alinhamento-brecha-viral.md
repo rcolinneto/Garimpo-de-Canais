@@ -105,17 +105,53 @@ Mesmo assim, operar em N mercados multiplica o consumo. As saídas são: mais
 chaves de API (o coletor já rotaciona chaves), menos mercados por ciclo, ou
 ciclos mais espaçados. **Decisão pendente do chefe.**
 
-## Perguntas em aberto (precisam do chefe antes da implementação final)
+## Decisões (fechadas em 2026-09-17)
 
-1. **Quais mercados/idiomas entram primeiro?** A tabela de RPM e o custo de
-   cota dependem dessa lista. Sugestão para começar: 3 a 5 países, misturando
-   CPM alto (EUA, Alemanha) com concorrência menor (Polônia, Itália).
-2. **Qual o apetite de cota?** Manter 1 chave e reduzir ambição, ou provisionar
-   chaves adicionais?
-3. **Quem julga "ângulo vago"?** O sistema consegue mostrar evidência (os
-   resultados naquele idioma são antigos? de canais pequenos?), mas julgar se
-   um recorte é de fato relevante para aquele país é decisão humana — a
-   pergunta 4 das 4 não é automatizável com honestidade.
+**1. Mercados: carteira mista, 4 países.** Um de CPM alto e três de menor
+concorrência, para comparar na prática qual rende mais antes de concentrar
+esforço:
+
+| Mercado | `regionCode` | `relevanceLanguage` | Papel |
+|---|---|---|---|
+| Estados Unidos | `US` | `en` | Maior CPM e alcance; maior concorrência |
+| Alemanha | `DE` | `de` | CPM alto com concorrência menor |
+| Itália | `IT` | `it` | Concorrência baixa |
+| Polônia | `PL` | `pl` | Concorrência baixa, CPM ainda relevante |
+
+**2. Cota: uma chave só, com rodízio de mercados.** Não provisionar chaves
+novas por ora. Cada execução valida **um** mercado, em rodízio — com 4 mercados
+cadastrados, cada um é revisitado a cada 4 ciclos.
+
+A decisão é coerente com a metodologia: brecha não surge e desaparece em 24
+horas, então revisitar um mercado a cada poucos dias não perde oportunidade. E
+é o que cabe em 10.000 unidades diárias enquanto a descoberta por nicho e o
+snapshot continuam rodando na mesma cota.
+
+Consequência a respeitar na implementação: `markets` precisa de controle de
+"último ciclo em que foi validado", igual ao `niches.last_discovery_at` que já
+existe para o rodízio de nichos.
+
+**3. Julgamento humano: o chefe decide direto.** Não haverá curadoria prévia —
+todas as candidatas aparecem para ele, cada uma com a prova ao lado, e é ele
+quem move entre `mapeada`, `validada`, `ocupada` e `descartada`.
+
+Isso **aumenta a exigência sobre a ordenação**: sem filtro humano antes, o
+`opportunity_score` é o que separa o que ele olha primeiro do que ele nunca vai
+rolar a página para ver. Uma candidata fraca no topo custa a confiança dele na
+tela inteira. Duas implicações práticas, registradas para a Fase 9:
+
+- A Tela 6 nasce ordenada por score e com corte configurável, não como lista
+  crua.
+- Vale mostrar quantas candidatas foram geradas e quantas ficaram abaixo do
+  corte — esconder ruído sem dizer que existe é enganoso.
+
+## Ainda em aberto
+
+- **Revisão do RPM estimado.** Os valores de `markets.rpm_estimado` são
+  estimativa de mercado, não dado da API. Precisam de uma primeira calibragem
+  com o chefe e de revisão periódica (cadência em `10-validacao-e-ajustes.md`).
+- **Limiar de corte da Tela 6.** Só dá para definir com candidatas reais na
+  tela; fica para a validação da Fase 9.
 
 ## Limites de honestidade do sistema
 
