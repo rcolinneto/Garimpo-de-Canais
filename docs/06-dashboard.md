@@ -44,3 +44,21 @@ Ao clicar em um canal na Tela 2:
 ## Autenticação
 
 Uma senha simples compartilhada (Streamlit suporta isso via variável de ambiente + um pequeno gate de login) é suficiente, já que é uso interno de uma pessoa/pequeno time. Login individual com usuários/papéis só se torna necessário se mais pessoas da empresa forem usar o dashboard — nesse caso, é um bom gatilho para migrar a apresentação de Streamlit para FastAPI + React (ver ressalva em `02-arquitetura.md`).
+
+## Tela 6 — Brechas (camada de oportunidade)
+
+> Acrescentada em 2026-09-17 pela rodada `00b-alinhamento-brecha-viral.md`. Entregável da Fase 9.
+
+A entrega final da metodologia Brecha Viral: a lista de oportunidades candidatas, ordenada por `opportunity_score`.
+
+Cada brecha mostra, em uma linha expansível:
+
+- **O vídeo que provou a demanda** — título, canal, views, quantas vezes acima da média do canal (o outlier), e há quantos dias foi publicado. É a condição 1 da metodologia, com o link para conferir no YouTube.
+- **As peças do formato reconhecidas** — os `title_signals` com a evidência de cada um, no mesmo formato visual dos sinais de monetização da Tela 3.
+- **O ângulo vago identificado** e, quando houver, o **mercado sugerido** com o RPM estimado e o número de falantes.
+- **A prova de espaço livre** — os resultados encontrados naquele idioma são antigos? de canais pequenos? É a resposta à pergunta 2 das 4, com os dados que a sustentam.
+- **O que falta validar manualmente** — a pergunta 4 ("o assunto faz sentido nesse país?") aparece como pendência explícita, com campo de anotação. O sistema não a responde.
+
+Ações disponíveis: mover o status entre `mapeada`, `validada`, `ocupada` e `descartada`. Só uma pessoa move — o sistema cria como `mapeada` e no máximo sugere `validada`.
+
+**Regra que vale aqui igual às outras telas**: nenhuma brecha aparece sem a evidência que a sustenta. Um número de oportunidade sem a prova ao lado seria um palpite com aparência de dado.

@@ -72,3 +72,63 @@ Pesos default sugeridos: `peso_crescimento = 0.5`, `peso_monetizacao = 0.3`, `pe
 ## Por que heurísticas e não um modelo de ML na v1
 
 Heurísticas são explicáveis (importante quando o resultado embasa decisão de negócio do chefe), não exigem dados de treino que vocês não têm, e são muito mais rápidas de implementar e ajustar via Claude Code. Um modelo de ML pode ser considerado numa fase futura, depois que houver histórico suficiente de canais rotulados manualmente ("esse aqui realmente virou oportunidade boa") para treinar/validar contra algo real.
+
+---
+
+# Camada de oportunidade (Brecha Viral)
+
+> Acrescentado em 2026-09-17 pela rodada `00b-alinhamento-brecha-viral.md`. Tudo acima continua valendo: o score de canal não foi substituído. A diferença é a unidade — aqui o sujeito é o **vídeo**, não o canal.
+
+## Outlier score
+
+Um vídeo Outlier performa muito acima da média do **próprio canal**. A comparação é sempre interna: 270 mil views é pouco para um canal que faz 800 mil e é um evento para um que faz 20 mil. Comparar canais entre si não diz nada sobre o que fez aquele vídeo funcionar.
+
+```
+outlier_ratio  = view_count / baseline_views
+outlier_score  = min(100, (outlier_ratio - 1) * 100 / FATOR) * recency_weight
+```
+
+- `baseline_views` = `channel_snapshots.avg_views_last_n_videos` do snapshot mais recente do canal, **excluindo o próprio vídeo** do cálculo quando possível — senão um vídeo que explodiu infla a média que deveria julgá-lo.
+- `outlier_ratio = 1` significa "na média do canal": score 0, não é outlier.
+- `recency_weight` decai com a idade do vídeo. A metodologia é explícita que recência é sinal ("quanto mais recente + mais views, melhor"): um pico de 3 dias atrás é oportunidade, o mesmo pico de 8 meses atrás é história.
+
+**Vídeos curtos (Shorts) não entram na mesma média que vídeos longos.** As distribuições de views são incomparáveis, e misturar as duas produz outlier fantasma. Por isso `videos.duration_seconds` existe no modelo.
+
+**Canal inteiro Outlier**: quando a maioria dos vídeos recentes está acima da média e o canal cresce rápido com poucos vídeos publicados, cada título vira fonte de brecha isolada — inclusive temas que o canal tocou uma vez e abandonou. Isso é sinal no nível do canal e reaproveita o `growth_score` que já existe.
+
+## Anatomia do título
+
+Heurísticas no mesmo molde das de monetização: padrão reconhecido, **evidência anexada** (o trecho exato do título) e confiança. Gravadas em `title_signals`.
+
+| `signal_type` | O que procura | Exemplo de evidência |
+|---|---|---|
+| `numero_alto` | Número que quantifica a promessa, acima de um limiar configurável | "25" em *"25 esconderijos…"* |
+| `autoridade_emprestada` | Profissão/instituição que empresta credibilidade | "policiais aposentados" |
+| `gatilho_medo` | Vocabulário de risco, perda, erro | "nunca verificam" |
+| `gatilho_desejo` | Ganho, economia, melhora | "economize", "dobre" |
+| `gatilho_curiosidade` | Informação retida, segredo, revelação | "ninguém te conta" |
+| `promessa_negativa` | Formulação por negação, que costuma performar acima da afirmativa | "não faça", "pare de" |
+
+Cada lista de vocabulário é configurável, pelo mesmo motivo das regras de monetização: gíria e formato mudam, e o chefe precisa poder ajustar sem mexer em código (ver cadência em `10-validacao-e-ajustes.md`).
+
+**Fora daqui de propósito:** "objeto concreto" é peça da metodologia mas não vira heurística — distinguir concreto de abstrato exige compreensão semântica, e uma regra por lista de palavras erraria tanto que o sinal perderia valor. Fica como leitura humana.
+
+## Opportunity score
+
+Combina o que já foi medido, sem inventar dado novo:
+
+```
+opportunity_score = (outlier_score        * peso_outlier)
+                  + (rpm_normalizado      * peso_rpm)
+                  + (espaco_livre_score   * peso_concorrencia)
+```
+
+- `rpm_normalizado` vem de `markets.rpm_estimado`, ponderado por `falantes_estimados` — CPM alto com pouco alcance pode render menos que o contrário. É a pergunta 3 das 4.
+- `espaco_livre_score` responde à pergunta 2: quanto mais os resultados daquele assunto naquele idioma forem **antigos ou de canais pequenos**, maior o espaço. Sem resultado nenhum não é nota máxima — pode significar que não há demanda (pergunta 1), não que a brecha é livre.
+- Pesos configuráveis, como os do score de canal.
+
+A pergunta 4 ("o assunto faz sentido nesse país?") **não entra na fórmula**. Clima, hábito e cultura não são deriváveis das métricas que temos, e fingir que são transformaria um palpite em número com aparência de precisão. Ela aparece no dashboard como checagem manual pendente, em `opportunities.notes`.
+
+## Por que a monetização continua importando
+
+Ela muda de papel em vez de sair: os sinais de monetização detectados no canal de origem são a prova concreta de que aquele nicho **paga** — sustentação de mercado para a pergunta do RPM, vinda de evidência observada e não de tabela estimada.

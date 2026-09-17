@@ -83,6 +83,41 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 
 ---
 
+## Fases da camada de oportunidade (Brecha Viral)
+
+> Acrescentadas em 2026-09-17 pela rodada `00b-alinhamento-brecha-viral.md`. Entram **depois** da Fase 6, sem reabrir as anteriores: o radar continua rodando enquanto a camada nova é construída em cima dele.
+>
+> **Bloqueio antes da Fase 9**: a cota da API já estoura hoje (ver aviso em `04-coleta-youtube.md`). As perguntas em aberto de `00b` — quais mercados e quantas chaves — precisam de resposta do chefe antes de multiplicar buscas por país.
+
+### Fase 7 — Vídeos como entidade e detecção de outlier
+
+**Objetivo**: responder "que vídeo performou muito acima da média do próprio canal", que é o passo GARIMPAR da metodologia.
+
+**Entregáveis**: tabelas `videos`, `video_snapshots` e `video_outliers`; migration; extração dos vídeos que já estão em `channel_snapshots.raw_payload` (o histórico já coletado não se perde); cálculo do outlier ponderado por recência, com Shorts separados de vídeos longos; nova seção na Tela 3 listando os outliers do canal com o porquê do número.
+
+**Prompt sugerido**:
+> Leia a seção "Camada de oportunidade" de `docs/05-motor-monetizacao-e-score.md` e as tabelas `videos`, `video_snapshots` e `video_outliers` de `docs/03-modelo-de-dados.md`. Implemente a coleta por vídeo e o cálculo de outlier_score. Aproveite o que já existe: `channel_snapshots.avg_views_last_n_videos` é a linha de base, e `raw_payload.recent_videos` já tem os vídeos históricos. Use `videos.list` em lote (até 50 IDs por unidade de cota).
+
+### Fase 8 — Anatomia do título
+
+**Objetivo**: o passo DISSECAR — quebrar o formato do vídeo em peças reconhecíveis.
+
+**Entregáveis**: tabela `title_signals`; heurísticas por lista configurável para os seis `signal_type` documentados; exibição das peças reconhecidas com a evidência (o trecho exato do título) na Tela 3.
+
+**Prompt sugerido**:
+> Leia "Anatomia do título" em `docs/05-motor-monetizacao-e-score.md`. Implemente a detecção no mesmo molde de `src/enrichment/monetization.py`: padrão, evidência anexada e confiança. Lembre que "objeto concreto" foi deliberadamente deixado de fora — não invente heurística para ele.
+
+### Fase 9 — Mercados e brechas
+
+**Objetivo**: os passos MAPEAR e VALIDAR — onde esse formato ainda não tem dono.
+
+**Entregáveis**: tabelas `markets` e `opportunities`; varredura barata por país via `chart=mostPopular&regionCode=XX` (1 unidade); `search.list` só para confirmar uma brecha específica, sob orçamento de cota; `opportunity_score`; **Tela 6 — Brechas**, com a lista de candidatas, a prova de cada uma e o campo de julgamento humano.
+
+**Prompt sugerido**:
+> Leia "Coleta para a camada de oportunidade" em `docs/04-coleta-youtube.md` e "Opportunity score" em `docs/05-motor-monetizacao-e-score.md`. Respeite a estratégia de custo: varredura barata primeiro, `search.list` só no fim. A 4ª das "4 perguntas" não entra na fórmula — ela é campo de anotação manual.
+
+---
+
 ## Depois de tudo pronto
 
 Volte para `README.md` e reveja o "Resumo para quem vai apresentar isso ao chefe" — nesse ponto você já vai ter dados reais do sistema (quantos canais descobertos, que nichos estão pontuando mais alto) para mostrar o valor entregue.

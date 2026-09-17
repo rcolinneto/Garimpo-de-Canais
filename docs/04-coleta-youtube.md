@@ -45,3 +45,44 @@ Se o número de canais monitorados crescer e uma única chave (10k unidades/dia)
 - Canal ficou privado ou foi excluído: `channels.list` retorna vazio — marcar `status = removed` em vez de apagar o histórico.
 - Canal desabilitou contagem pública de inscritos: `statistics.hiddenSubscriberCount = true` — tratar `subscriber_count` como nulo naquele snapshot, não como zero.
 - Quota estourada no meio do job: o job deve parar de forma limpa, registrar em `collection_runs` quantos itens processou antes de parar, e retomar no próximo dia de onde parou (não do zero).
+
+---
+
+# Coleta para a camada de oportunidade (Brecha Viral)
+
+> Acrescentado em 2026-09-17 pela rodada `00b-alinhamento-brecha-viral.md`.
+
+## Outro país é um parâmetro, não um proxy
+
+O treinamento que originou a metodologia ensina usar proxy e spoofing de localização para ver o YouTube de outros países. **Não fazemos isso.** A API aceita os dois parâmetros nativamente:
+
+- `regionCode` — país (ISO 3166-1 alfa-2), aceito em `search.list` e `videos.list`
+- `relevanceLanguage` — idioma de relevância, aceito em `search.list`
+
+Pedir dados de outro mercado é preencher um campo da requisição. Mais barato (sem infra de proxy), mais confiável (dado oficial em vez de página renderizada) e dentro dos Termos de Uso — coerente com a decisão de `00` de não basear o produto em scraping.
+
+## O custo é a restrição central
+
+| Chamada | Custo | Uso na camada de oportunidade |
+|---|---|---|
+| `search.list` | **100 unidades** | Confirmar se há canal atendendo um assunto num idioma (pergunta 2 das 4) |
+| `videos.list` (`chart=mostPopular`, com `regionCode`) | **1 unidade** | Varrer o que está em alta num país |
+| `videos.list` (por IDs, até 50) | **1 unidade** | Atualizar métricas de vídeos já conhecidos |
+| `playlistItems.list` | **1 unidade** | Listar vídeos recentes de um canal |
+
+Cota diária da chave: **10.000 unidades**.
+
+A conta que decide o desenho: validar uma brecha em 5 mercados por busca custa 5 × 100 = **500 unidades**, 5% da cota do dia para **uma** brecha. Trinta brechas consumiriam uma cota e meia.
+
+## Estratégia: caro só no fim
+
+1. **Varredura barata primeiro.** `chart=mostPopular&regionCode=XX` custa 1 unidade e revela o que está em alta em cada país. Varrer 20 países custa 20 unidades — o mesmo que um quinto de uma única busca.
+2. **Vídeos por lote.** `videos.list` aceita até 50 IDs por chamada de 1 unidade. Atualizar 200 vídeos custa 4 unidades, não 200.
+3. **`search.list` só para confirmar.** Reservado para a brecha que já passou pelo funil, com orçamento por execução — o mecanismo `discovery_quota_budget` já existe e vale igual aqui.
+4. **Rotação de chaves.** O coletor já troca de chave ao estourar a cota de uma (`youtube_api_keys`). Operar em vários mercados provavelmente exige mais de uma chave.
+
+## Aviso operacional
+
+**A cota já estoura hoje, antes desta camada existir.** Em 2026-09-14 a busca sob demanda respondeu "cota do dia estourou" tendo gasto 100 unidades e encontrado zero canais — a busca por nicho ficou sem combustível enquanto a coleta barata de vídeos em alta (1 unidade) seguia funcionando.
+
+Isso precisa ser resolvido **antes** de multiplicar mercados, senão a camada nova nasce sem cota para rodar. As saídas estão listadas como pergunta em aberto em `00b`: mais chaves, menos mercados por ciclo, ou ciclos mais espaçados. O endpoint `GET /coletas` e o aviso na Visão Geral mostram o consumo real por execução — é por ali que se acompanha.

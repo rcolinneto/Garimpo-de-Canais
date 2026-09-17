@@ -5,12 +5,14 @@
 - **Dono do produto**: o chefe de Renato (patrocinador do pedido), na agência de marketing onde Renato trabalha como analista. É quem consome o resultado final via dashboard e para quem os critérios de sucesso devem fazer sentido.
 - **Executor/mantenedor**: Renato, com apoio do Claude Code para implementação.
 - **Objetivo**: um radar automático de canais do YouTube em crescimento que estão monetizando nichos virais — insumo para identificar oportunidades de conteúdo e formatos/modelos de monetização que já estão funcionando para outros criadores.
+- **Camada de oportunidade (desde 2026-09-17)**: sobre esse radar roda a metodologia **Brecha Viral** — achar vídeos que performaram muito acima da média do próprio canal, dissecar o formato e apontar ângulos/mercados ainda não ocupados. Ela **soma** ao radar, não o substitui: o histórico de views por canal que o radar coleta é justamente a linha de base que o cálculo de outlier precisa. Ver `docs/00b-alinhamento-brecha-viral.md` e `docs/brecha-viral/metodologia.md`.
 - **Como se relaciona com a operação da agência**: este sistema é **insumo para estratégia de conteúdo** (o que produzir, em qual nicho, com qual abordagem de monetização) — **não é uma ferramenta de gestão de campanha** (não substitui, nem se integra com, ferramentas de mídia paga, relatórios de cliente ou operação de tráfego pago da agência). Não expandir o escopo para essas funções sem uma nova rodada de alinhamento explícita (ver `docs/00-brainstorm-e-alinhamento.md`).
 
 ## Antes de qualquer tarefa
 
 Toda a especificação do projeto está em `docs/`. Antes de implementar qualquer parte, leia, na ordem:
 1. `docs/00-brainstorm-e-alinhamento.md` — como o escopo chegou a ser o que é hoje (inclui decisões descartadas, para não serem re-propostas sem necessidade).
+1b. `docs/00b-alinhamento-brecha-viral.md` — a segunda rodada de alinhamento, que somou a metodologia Brecha Viral. Traz também as restrições duras (cota da API) e as perguntas ainda em aberto com o chefe.
 2. `docs/01-visao-geral-e-escopo.md` — objetivo, escopo e critérios de sucesso.
 3. `docs/02-arquitetura.md` — arquitetura, stack e estrutura de pastas obrigatória.
 4. `docs/09-requisitos-nao-funcionais.md` — checklist de requisitos não-funcionais (performance, segurança, custo) que qualquer implementação deve respeitar.
