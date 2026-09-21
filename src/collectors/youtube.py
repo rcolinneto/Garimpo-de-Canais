@@ -249,6 +249,86 @@ class YouTubeCollector:
         )
         return self._refs_from_video_items(response.get("items", []))
 
+    def avaliar_espaco_no_mercado(
+        self, termo: str, region_code: str, language_code: str
+    ) -> dict:
+        """Pergunta 2 das "4 perguntas": há canal atendendo esse assunto nesse
+        idioma? (search.list, 100 unidades).
+
+        Chamada cara, de propósito reservada para confirmar uma brecha que já
+        passou pelo funil barato (docs/04). Devolve a contagem de resultados e
+        quantos são fracos — antigos ou de canais pequenos —, que é a evidência
+        que sustenta a resposta no dashboard.
+
+        `regionCode` e `relevanceLanguage` são parâmetros nativos da API: pedir
+        dados de outro país é preencher um campo, não fraudar geolocalização.
+        """
+        if not termo.strip():
+            return {"resultados": 0, "antigos": 0, "canais_pequenos": 0, "termo": termo}
+
+        resposta = self._execute(
+            lambda service: service.search().list(
+                part="snippet",
+                q=termo,
+                type="video",
+                order="relevance",
+                regionCode=region_code,
+                relevanceLanguage=language_code,
+                maxResults=25,
+            ),
+            SEARCH_LIST_COST,
+        )
+        itens = resposta.get("items", [])
+        corte = datetime.now(timezone.utc) - timedelta(
+            days=settings.concorrencia_video_antigo_dias
+        )
+
+        antigos = 0
+        canais = []
+        for item in itens:
+            snippet = item.get("snippet", {})
+            publicado = _parse_published_at(snippet.get("publishedAt"))
+            if publicado and publicado < corte:
+                antigos += 1
+            canal_id = snippet.get("channelId")
+            if canal_id:
+                canais.append(canal_id)
+
+        pequenos = self._contar_canais_pequenos(canais)
+        return {
+            "resultados": len(itens),
+            "antigos": antigos,
+            "canais_pequenos": pequenos,
+            "termo": termo,
+            "mercado": f"{region_code}/{language_code}",
+        }
+
+    def _contar_canais_pequenos(self, channel_ids: list[str]) -> int:
+        """Quantos dos canais encontrados são pequenos (channels.list, 1 unidade).
+
+        Em lote de até 50 IDs por chamada: perguntar um a um custaria o mesmo
+        por canal e é justamente o que a estratégia de cota evita (docs/04).
+        """
+        unicos = list(dict.fromkeys(channel_ids))[:50]
+        if not unicos:
+            return 0
+        resposta = self._execute(
+            lambda service: service.channels().list(
+                part="statistics", id=",".join(unicos)
+            ),
+            CHANNELS_LIST_COST,
+        )
+        limite = settings.concorrencia_canal_pequeno_inscritos
+        pequenos = 0
+        for item in resposta.get("items", []):
+            estatisticas = item.get("statistics", {})
+            if estatisticas.get("hiddenSubscriberCount"):
+                continue
+            inscritos = _to_int(estatisticas.get("subscriberCount"))
+            if inscritos is not None and inscritos < limite:
+                pequenos += 1
+        return pequenos
+
     def discover_trending_candidates(self, category_ids: list[str] | None = None) -> list[ChannelRef]:
         """Descoberta barata via vídeos em alta (videos.list chart=mostPopular, 1 unidade).
 

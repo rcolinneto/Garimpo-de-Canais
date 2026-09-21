@@ -9,10 +9,16 @@ formato de um idioma para outro; uma heurística só em português seria cega
 exatamente onde ela precisa enxergar. Os títulos já coletados incluem
 português, inglês e espanhol.
 
-Cobertura hoje: PT, EN, ES. Os mercados decididos em `docs/00b` incluem
-alemão, italiano e polonês — esse vocabulário **ainda não existe aqui** e
-precisa entrar antes da Fase 9 colocar esses mercados no ar, senão o sistema
-vai parecer dizer "não há peça reconhecida" quando na verdade não sabe ler.
+Cobertura: **PT, EN, ES, DE, IT, PL** — os seis idiomas dos mercados
+decididos em `docs/00b`. Um idioma fora dessa lista faz o sistema dizer
+"nenhuma peça reconhecida" quando na verdade não sabe ler: silêncio que parece
+resposta. Ao abrir mercado novo, o vocabulário entra antes.
+
+**Limite conhecido:** a comparação é por palavra exata, então idiomas muito
+flexionados (polonês, alemão) perdem formas declinadas — "policjanta" não casa
+com "policjant". Isso é subdetecção, que é o lado seguro do erro: casar por
+prefixo pegaria as flexões, mas também faria "sem" casar dentro de "sempre",
+e falso positivo com evidência anexada é pior que silêncio.
 
 Especificação: `docs/05-motor-monetizacao-e-score.md`, seção "Anatomia do
 título".
@@ -45,6 +51,15 @@ VOCABULARIO = {
         # ES
         "policia", "policias", "abogado", "experto", "expertos", "ingeniero",
         "cientifico", "enfermera", "jubilado",
+        # DE
+        "polizist", "polizisten", "arzt", "arzte", "anwalt", "experte",
+        "experten", "ingenieur", "wissenschaftler", "rentner", "ehemaliger",
+        # IT
+        "poliziotto", "poliziotti", "medici", "avvocato", "esperto", "esperti",
+        "ingegnere", "professore", "scienziato", "pensionato",
+        # PL
+        "policjant", "policjanci", "lekarz", "lekarze", "prawnik", "ekspert",
+        "eksperci", "inzynier", "naukowiec", "emeryt",
     ],
     "gatilho_medo": [
         # PT
@@ -58,6 +73,17 @@ VOCABULARIO = {
         # ES
         "nunca", "error", "peligro", "peligroso", "evita", "riesgo", "estafa",
         "ladron", "ladrones", "muerte", "peor",
+        # DE
+        "nie", "niemals", "fehler", "gefahr", "gefahrlich", "achtung",
+        "vermeiden", "risiko", "betrug", "falle", "dieb", "diebe", "todlich",
+        "schlimmste",
+        # IT
+        "mai", "errore", "errori", "pericolo", "pericoloso", "attenzione",
+        "evita", "rischio", "truffa", "trappola", "ladro", "ladri", "mortale",
+        "peggiore",
+        # PL
+        "nigdy", "blad", "bledy", "niebezpieczenstwo", "uwaga", "unikaj",
+        "ryzyko", "oszustwo", "pulapka", "zlodziej", "smiertelny", "najgorszy",
     ],
     "gatilho_desejo": [
         # PT
@@ -70,6 +96,15 @@ VOCABULARIO = {
         # ES
         "gana", "ganar", "ahorra", "ahorrar", "duplica", "aumenta", "rico",
         "riqueza", "dinero", "gratis", "barato", "rapido", "facil",
+        # DE
+        "verdienen", "sparen", "verdoppeln", "erhohen", "verbessern", "reich",
+        "reichtum", "gewinn", "geld", "kostenlos", "billig", "schnell",
+        # IT
+        "guadagna", "risparmia", "raddoppia", "aumenta", "migliora", "ricco",
+        "ricchezza", "profitto", "soldi", "economico", "veloce",
+        # PL
+        "zarabiaj", "oszczedzaj", "zwieksz", "popraw", "bogaty", "bogactwo",
+        "zysk", "pieniadze", "darmo", "tani", "szybko", "latwo",
     ],
     "gatilho_curiosidade": [
         # PT
@@ -83,13 +118,28 @@ VOCABULARIO = {
         # ES
         "secreto", "secretos", "nadie", "verdad", "revelado", "escondido",
         "por que", "que pasa", "sabias", "misterio",
+        # DE
+        "geheimnis", "geheime", "niemand", "wahrheit", "enthullt", "versteckt",
+        "warum", "wusstest du", "ratsel",
+        # IT
+        "segreto", "segreti", "nessuno", "verita", "rivelato", "nascosto",
+        "perche", "cosa succede", "lo sapevi", "mistero",
+        # PL
+        "sekret", "sekrety", "tajemnica", "nikt", "prawda", "ujawnione",
+        "ukryte", "dlaczego", "czy wiesz",
     ],
     "promessa_negativa": [
         # Formulação por negação — costuma performar acima da afirmativa. Só
         # imperativos explícitos, para não colidir com gatilho_medo.
         "nao faca", "nao compre", "nao use", "pare de", "deixe de", "sem",
+        # Primeira pessoa também é formato de negação, e é dos que mais
+        # performam: "por que eu não uso mais X" é depoimento negativo.
+        "nao uso", "nao recomendo", "nunca mais", "parei de", "deixei de",
         "dont", "do not", "stop", "quit", "without", "no more",
         "no hagas", "no compres", "deja de", "sin",
+        "mach nicht", "kaufe nicht", "hor auf", "ohne",
+        "non fare", "non comprare", "smetti di", "senza",
+        "nie rob", "nie kupuj", "przestan", "bez",
     ],
 }
 
@@ -131,9 +181,15 @@ class DetectedTitleSignal:
     confidence: float
 
 
+# O "ł" polonês é um caractere próprio (U+0142), não um "l" com diacrítico:
+# o NFD não o decompõe, então precisa de tradução explícita. Sem isto, metade
+# do vocabulário polonês nunca casaria.
+_TRADUCOES = str.maketrans({"ł": "l", "Ł": "l", "ß": "ss", "ø": "o", "đ": "d"})
+
+
 def _normalizar(texto: str) -> str:
     """Minúsculas e sem acento, para a lista não precisar de cada variação."""
-    sem_acento = unicodedata.normalize("NFD", texto.lower())
+    sem_acento = unicodedata.normalize("NFD", texto.lower().translate(_TRADUCOES))
     return "".join(c for c in sem_acento if unicodedata.category(c) != "Mn")
 
 

@@ -111,11 +111,17 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 **Prompt sugerido**:
 > Leia "Anatomia do título" em `docs/05-motor-monetizacao-e-score.md`. Implemente a detecção no mesmo molde de `src/enrichment/monetization.py`: padrão, evidência anexada e confiança. Lembre que "objeto concreto" foi deliberadamente deixado de fora — não invente heurística para ele.
 
-### Fase 9 — Mercados e brechas
+### Fase 9 — Mercados e brechas ✅ concluída em 2026-09-21
 
 **Objetivo**: os passos MAPEAR e VALIDAR — onde esse formato ainda não tem dono.
 
 **Entregáveis**: tabelas `markets` (semeada com a carteira de `00b`: US/en, DE/de, IT/it, PL/pl) e `opportunities`; **rodízio de um mercado por ciclo** via `last_validated_at`; varredura barata por país com `chart=mostPopular&regionCode=XX` (1 unidade); `search.list` só para confirmar uma brecha específica, sob orçamento de cota; `opportunity_score`; **Tela 6 — Brechas**, ordenada por score com corte configurável, a prova de cada candidata e o campo de anotação manual.
+
+**Resultado**: validado de ponta a ponta contra a API real — 3 brechas mapeadas no mercado US/en por **303 unidades** de cota.
+
+**A restrição de cota não existia.** Medido em produção com o endpoint `/coletas`: o sistema consome ~1.000 das 10.000 unidades diárias, não as 10.000. O aviso de "cota estourando" registrado em 2026-09-14 estava desatualizado. O rodízio de um mercado por ciclo foi mantido mesmo assim (é a decisão de `00b` e é conservador), mas virou `markets_per_run`, ajustável sem mexer em código.
+
+**Descoberta que mudou o desenho:** sem filtro, o topo da lista era letra de música e coletânea — conteúdo que performa mas não é formato replicável. Passou a valer que só vira candidata quem tem **formato reconhecível no título** (a saída da Fase 8): a condição 2 da metodologia pressupõe um ângulo a portar, e uma letra de música não tem. Dos 19 outliers elegíveis, 5 têm formato. Como o chefe decide direto, sem curadoria prévia, lixo no topo custaria a confiança na tela inteira.
 
 **Prompt sugerido**:
 > Leia "Coleta para a camada de oportunidade" em `docs/04-coleta-youtube.md` e "Opportunity score" em `docs/05-motor-monetizacao-e-score.md`. Respeite a estratégia de custo: varredura barata primeiro, `search.list` só no fim. A 4ª das "4 perguntas" não entra na fórmula — ela é campo de anotação manual.

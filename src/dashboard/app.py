@@ -337,6 +337,7 @@ SEGUNDOS_DE_CACHE = 120
 LEITURAS_CACHEAVEIS = {
     "ranking_de_nichos",
     "listar_coletas",
+    "listar_brechas",
     "outliers_do_canal",
     "listar_canais",
     "detalhar_canal",
@@ -1099,6 +1100,77 @@ def tela_alertas() -> None:
         st.info("Nenhum alerta disparado até agora.")
 
 
+# --- Tela 6 -----------------------------------------------------------------
+
+
+def tela_brechas() -> None:
+    page_header(
+        "🧩",
+        "Brechas",
+        "Formatos que já provaram demanda e cujo espaço ainda não foi ocupado.",
+    )
+
+    with st.sidebar:
+        st.header("🔧 Corte")
+        st.caption("Abaixo deste score a candidata não aparece na lista.")
+        corte = st.slider("Score mínimo", 0.0, 100.0, 40.0, 5.0)
+
+    dados = carregar(api_client.listar_brechas, min_score=corte)
+    if dados is None:
+        return
+
+    eyebrow(f"{dados['acima_do_corte']} de {dados['total']} candidatas acima do corte")
+    st.caption(
+        "Ordenadas por score. O score combina o quanto o vídeo fugiu da média do "
+        "canal, o retorno estimado do mercado e o espaço livre encontrado lá."
+    )
+    if dados["total"] > dados["acima_do_corte"]:
+        st.caption(
+            f"↓ {dados['total'] - dados['acima_do_corte']} candidatas ficaram abaixo "
+            "do corte. Baixe o filtro ao lado para vê-las."
+        )
+
+    if not dados["items"]:
+        st.info(
+            "Nenhuma brecha mapeada ainda com esse corte. O mapeamento roda junto "
+            "com a coleta e precisa de vídeos com outlier relevante para começar."
+        )
+        return
+
+    for brecha in dados["items"]:
+        titulo = brecha["video_title"] or brecha["youtube_video_id"]
+        mercado = brecha["market_name"] or "mesmo mercado do original"
+        with st.expander(
+            f"{_arredondar(brecha['opportunity_score'])} · {titulo[:70]} → {mercado}"
+        ):
+            st.markdown(
+                f"**O que provou a demanda:** [{html.escape(titulo)}]"
+                f"(https://www.youtube.com/watch?v={html.escape(brecha['youtube_video_id'])}) "
+                f"— canal {html.escape(brecha['channel_name'] or '—')}, "
+                f"publicado em {(brecha['video_published_at'] or '')[:10]}."
+            )
+            if brecha["region_code"]:
+                st.markdown(
+                    f"**Mercado sugerido:** {html.escape(mercado)} "
+                    f"(`{brecha['region_code']}`/`{brecha['language_code']}`), "
+                    f"RPM estimado {_arredondar(brecha['rpm_estimado'])}."
+                )
+
+            evidencia = brecha.get("concorrencia_evidence") or {}
+            colunas = st.columns(3)
+            colunas[0].metric("Resultados no idioma", evidencia.get("resultados", "—"))
+            colunas[1].metric("Antigos", evidencia.get("antigos", "—"))
+            colunas[2].metric("De canais pequenos", evidencia.get("canais_pequenos", "—"))
+
+            st.warning(
+                "**Falta validar manualmente:** o assunto faz sentido neste país? "
+                "Clima, hábitos e cultura mudam a relevância de um tema, e isso não "
+                "é derivável das métricas — o sistema não responde essa pergunta."
+            )
+            with st.expander("Como esse score foi calculado?"):
+                st.json(evidencia)
+
+
 # --- navegação --------------------------------------------------------------
 
 
@@ -1142,6 +1214,7 @@ def main() -> None:
         st.Page(tela_detalhe, title="Detalhe do Canal", icon="📈"),
         st.Page(tela_nichos, title="Configuração de Nichos", icon="⚙️"),
         st.Page(tela_alertas, title="Alertas e Relatórios", icon="🔔"),
+        st.Page(tela_brechas, title="Brechas", icon="🧩"),
     ]
     # Navegação na barra lateral (posição padrão do st.navigation). A Tela 2
     # soma seus próprios filtros logo abaixo da lista de páginas.

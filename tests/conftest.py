@@ -31,8 +31,10 @@ def modelos_para_limpar():
         Channel,
         ChannelScore,
         ChannelSnapshot,
+        Market,
         MonetizationSignal,
         Niche,
+        Opportunity,
         TitleSignal,
         Video,
         VideoOutlier,
@@ -40,6 +42,8 @@ def modelos_para_limpar():
     )
 
     return (
+        Opportunity,
+        Market,
         TitleSignal,
         VideoOutlier,
         VideoSnapshot,

@@ -27,6 +27,7 @@ from src.enrichment.monetization import dedupe_key, detect_signals
 from src.enrichment.scoring import run_enrichment
 from src.scheduler.alerts import alertar_falha_de_job, run_alerts_job
 from src.scheduler.discovery import discover_niche_now, register_candidates, snapshot_row
+from src.scheduler.brechas import mapear_brechas
 from src.scheduler.videos import calcular_outliers_do_canal, persistir_videos
 
 logger = logging.getLogger(__name__)
@@ -236,6 +237,20 @@ def run_snapshot_job() -> None:
             # monetização já gravados acima, scores calculados agora.
             run_enrichment(session)
             session.commit()
+
+            # Brechas dependem dos outliers recém-calculados acima. Rodam aqui,
+            # no fim do pipeline, e uma falha não invalida a coleta: o mapeamento
+            # é a camada mais nova e a menos crítica do ciclo diário.
+            try:
+                resumo = mapear_brechas(session, collector)
+                session.commit()
+                logger.info("Mapeamento de brechas: %s", resumo)
+            except QuotaExceededError as error:
+                status = "partial"
+                error_message = f"Cota esgotada no mapeamento de brechas: {error}"
+                logger.warning(error_message)
+            except Exception:  # noqa: BLE001
+                logger.exception("Falha ao mapear brechas após o snapshot")
 
         # Alertas rodam depois do cálculo de score, em sessão própria, e uma falha
         # de e-mail não pode invalidar a coleta que já deu certo.

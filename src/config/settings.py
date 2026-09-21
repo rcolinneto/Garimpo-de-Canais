@@ -76,6 +76,38 @@ class Settings(BaseSettings):
     # desaparece: ele ainda prova que o formato funciona.
     outlier_recency_floor: float = 0.1
 
+    # --- Score de oportunidade (brechas, docs/05) ---
+    peso_outlier: float = 0.5
+    peso_rpm: float = 0.2
+    peso_concorrencia: float = 0.3
+    # RPM (US$ por mil views) que vale nota 100 na componente financeira.
+    rpm_teto: float = 12.0
+    # Falantes que já contam como alcance pleno — acima disso não pontua mais.
+    falantes_referencia: int = 100_000_000
+    # Piso do fator de alcance: mercado pequeno e rico continua valendo algo.
+    peso_alcance_minimo: float = 0.4
+    # Nota quando a busca não achou NADA no idioma. Deliberadamente morna, não
+    # máxima: silêncio pode ser ausência de demanda, não brecha livre.
+    espaco_livre_sem_resultado: float = 40.0
+    # Quantos mercados são validados por execução (rodízio, docs/00b). Uma
+    # chave de API cobre folgadamente mais que isto — medido: o sistema usa
+    # ~1.000 das 10.000 unidades diárias — então dá para subir se quiser.
+    markets_per_run: int = 1
+    # Outlier mínimo para um vídeo virar candidato a brecha. Sem outlier não há
+    # condição 1 da metodologia ("o assunto já performa") — seria aposta.
+    outlier_minimo_para_brecha: float = 20.0
+    # Só vira candidata a brecha quem tem formato reconhecível no título. Sem
+    # isto o topo da lista vira letra de música e coletânea: conteúdo que
+    # performa, mas não é formato replicável em outro mercado.
+    exigir_formato_reconhecivel: bool = True
+    # Quantas brechas são validadas por execução. Cada uma custa ~101 unidades
+    # (1 search.list + 1 channels.list em lote).
+    opportunities_per_run: int = 3
+    # Idade a partir da qual um resultado conta como "antigo" na pergunta 2.
+    concorrencia_video_antigo_dias: int = 365
+    # Abaixo deste tamanho, o canal conta como "pequeno" na pergunta 2.
+    concorrencia_canal_pequeno_inscritos: int = 50_000
+
     # Quantos vídeos recentes são analisados por canal em cada snapshot
     recent_videos_count: int = 10
 

@@ -170,6 +170,14 @@ def outliers_do_canal(channel_id: int, limit: int = 10) -> list[dict]:
     return _requisitar("GET", f"/canais/{channel_id}/outliers", params={"limit": limit})
 
 
+def listar_brechas(min_score: float | None = None, limit: int = 50) -> dict:
+    """Brechas candidatas, ordenadas por score (Tela 6)."""
+    params = {"limit": limit}
+    if min_score is not None:
+        params["min_score"] = min_score
+    return _requisitar("GET", "/brechas", params=params)
+
+
 def listar_coletas(limit: int = 20) -> list[dict]:
     """Últimas rodadas de coleta — mostra se os jobs estão mesmo rodando."""
     return _requisitar("GET", "/coletas", params={"limit": limit})

@@ -200,6 +200,62 @@ class TitleSignal(Base):
     video: Mapped[Video] = relationship(back_populates="title_signals")
 
 
+class Market(Base):
+    """País/idioma candidato a receber um formato já validado (docs/03).
+
+    Cadastrado e mantido à mão: RPM não vem da API do YouTube, é estimativa de
+    mercado e precisa de revisão periódica.
+    """
+
+    __tablename__ = "markets"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Os mesmos valores que a API aceita em regionCode/relevanceLanguage — é
+    # assim que pedimos dados de outro país, sem proxy nem spoofing (docs/00b).
+    region_code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    language_code: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    rpm_estimado: Mapped[float | None] = mapped_column(Numeric)
+    # Contrapeso do RPM: CPM alto com pouco alcance pode render menos.
+    falantes_estimados: Mapped[int | None] = mapped_column(BigInteger)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # Sustenta o rodízio de um mercado por ciclo, mesmo papel de
+    # `niches.last_discovery_at`.
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    opportunities: Mapped[list["Opportunity"]] = relationship(back_populates="market")
+
+
+class Opportunity(Base):
+    """A brecha: um formato validado × um ângulo × um mercado (docs/03).
+
+    Entrega final da camada de oportunidade. `status` é ciclo de vida, não
+    cálculo: quem move para `ocupada` ou `descartada` é uma pessoa — decidido
+    em `docs/00b`, o chefe decide direto.
+    """
+
+    __tablename__ = "opportunities"
+    __table_args__ = (Index("ix_opportunities_score", "opportunity_score"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    market_id: Mapped[int | None] = mapped_column(ForeignKey("markets.id"))
+    angulo: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="mapeada")
+    # Respostas às perguntas 1 e 2 das "4 perguntas", com o dado que as sustenta.
+    volume_evidence: Mapped[dict | None] = mapped_column(JSONB)
+    concorrencia_evidence: Mapped[dict | None] = mapped_column(JSONB)
+    opportunity_score: Mapped[float | None] = mapped_column(Numeric)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # A pergunta 4 ("faz sentido nesse país?") não é automatizável: vive aqui.
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    video: Mapped[Video] = relationship()
+    market: Mapped[Market | None] = relationship(back_populates="opportunities")
+
+
 class MonetizationSignal(Base):
     __tablename__ = "monetization_signals"
 

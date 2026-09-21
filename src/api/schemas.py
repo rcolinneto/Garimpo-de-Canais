@@ -202,3 +202,35 @@ class VideoOutlierItem(BaseModel):
     outlier_score: float | None
     breakdown: dict | None
     pecas_do_titulo: list[PecaDoTitulo] = []
+
+
+class Brecha(BaseModel):
+    """Uma oportunidade candidata: formato validado × ângulo × mercado (Tela 6)."""
+
+    id: int
+    opportunity_score: float | None
+    status: str
+    angulo: str | None
+    notes: str | None
+    created_at: datetime
+    # A prova que sustenta a candidata — sem ela, o número seria palpite.
+    youtube_video_id: str
+    video_title: str | None
+    video_published_at: datetime | None
+    channel_name: str | None
+    channel_url: str | None
+    market_name: str | None
+    region_code: str | None
+    language_code: str | None
+    rpm_estimado: float | None
+    volume_evidence: dict | None
+    concorrencia_evidence: dict | None
+
+
+class ListaBrechas(BaseModel):
+    """Inclui quantas ficaram abaixo do corte: esconder ruído sem dizer que
+    existe seria enganoso (docs/00b)."""
+
+    total: int
+    acima_do_corte: int
+    items: list[Brecha]

@@ -108,3 +108,26 @@ def test_medida_nao_vira_numero_alto():
     assert "numero_alto" not in tipos("Economize 500 reais por mês")
     # Mas contagem de itens continua valendo.
     assert "numero_alto" in tipos("1.000 dicas de produtividade")
+
+
+@pytest.mark.parametrize(
+    "idioma,titulo",
+    [
+        ("alemão", "10 Verstecke die Diebe niemals prüfen (Polizisten im Ruhestand)"),
+        ("italiano", "15 nascondigli che i ladri non controllano mai (poliziotti in pensione)"),
+        ("polonês", "12 kryjówek których złodzieje nigdy nie sprawdzają"),
+    ],
+)
+def test_reconhece_os_idiomas_dos_mercados_decididos(idioma, titulo):
+    """Os mercados de 00b são US/en, DE/de, IT/it e PL/pl. Sem o vocabulário, o
+    sistema diria "nenhuma peça" quando na verdade não sabe ler o idioma."""
+    encontrados = tipos(titulo)
+
+    assert "numero_alto" in encontrados, f"número não reconhecido em {idioma}"
+    assert "gatilho_medo" in encontrados, f"gatilho não reconhecido em {idioma}"
+
+
+def test_caractere_polones_l_cortado_e_normalizado():
+    """"ł" é caractere próprio (U+0142), não "l" com acento: o NFD não o
+    decompõe, então sem tradução explícita metade do polonês nunca casaria."""
+    assert "gatilho_medo" in tipos("Najgorszy błąd który możesz popełnić")

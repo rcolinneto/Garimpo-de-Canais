@@ -16,8 +16,10 @@ from src.db.models import (
     CollectionRun,
     ChannelScore,
     ChannelSnapshot,
+    Market,
     MonetizationSignal,
     Niche,
+    Opportunity,
     TitleSignal,
     Video,
     VideoOutlier,
@@ -370,3 +372,47 @@ def title_signals_by_video(session, youtube_video_ids: list[str]) -> dict[str, l
             {"signal_type": signal_type, "evidence": evidence, "confidence": confidence}
         )
     return por_video
+
+
+def opportunities(session, min_score: float | None = None, limit: int = 50):
+    """Brechas candidatas, da maior nota para a menor (Tela 6).
+
+    Ordenação é crítica aqui: como o chefe decide direto, sem curadoria prévia
+    (docs/00b), o score é o que separa o que ele olha do que nunca vai ver.
+    """
+    stmt = (
+        select(
+            Opportunity.id,
+            Opportunity.angulo,
+            Opportunity.status,
+            Opportunity.opportunity_score,
+            Opportunity.volume_evidence,
+            Opportunity.concorrencia_evidence,
+            Opportunity.notes,
+            Opportunity.created_at,
+            Video.youtube_video_id,
+            Video.title.label("video_title"),
+            Video.published_at.label("video_published_at"),
+            Channel.display_name.label("channel_name"),
+            Channel.url.label("channel_url"),
+            Market.name.label("market_name"),
+            Market.region_code,
+            Market.language_code,
+            Market.rpm_estimado,
+        )
+        .select_from(Opportunity)
+        .join(Video, Video.id == Opportunity.video_id)
+        .join(Channel, Channel.id == Video.channel_id)
+        .outerjoin(Market, Market.id == Opportunity.market_id)
+        .order_by(Opportunity.opportunity_score.desc().nullslast(), Opportunity.id)
+    )
+    if min_score is not None:
+        stmt = stmt.where(Opportunity.opportunity_score >= min_score)
+    return session.execute(stmt.limit(limit)).all()
+
+
+def count_opportunities(session, min_score: float | None = None) -> int:
+    stmt = select(func.count()).select_from(Opportunity)
+    if min_score is not None:
+        stmt = stmt.where(Opportunity.opportunity_score >= min_score)
+    return session.execute(stmt).scalar_one()

@@ -70,6 +70,26 @@ DETALHE = CANAL | {
     ],
 }
 
+BRECHA = {
+    "id": 1,
+    "opportunity_score": 72.5,
+    "status": "mapeada",
+    "angulo": None,
+    "notes": None,
+    "created_at": "2026-09-21T10:00:00+00:00",
+    "youtube_video_id": "vid_abc",
+    "video_title": "25 esconderijos que ladrões nunca verificam",
+    "video_published_at": "2026-09-18T10:00:00+00:00",
+    "channel_name": "Canal Teste",
+    "channel_url": "https://youtube.com/@canalteste",
+    "market_name": "Polônia (polonês)",
+    "region_code": "PL",
+    "language_code": "pl",
+    "rpm_estimado": 6.0,
+    "volume_evidence": {"termo": "esconderijos", "resultados": 12},
+    "concorrencia_evidence": {"resultados": 12, "antigos": 9, "canais_pequenos": 2},
+}
+
 COLETA_OK = {
     "job_type": "snapshot",
     "started_at": "2026-09-14T08:00:00+00:00",
@@ -132,6 +152,11 @@ def api_falsa(monkeypatch):
     )
     monkeypatch.setattr(api_client, "ranking_de_nichos", lambda: [NICHO])
     monkeypatch.setattr(api_client, "listar_coletas", lambda limit=20: [COLETA_OK])
+    monkeypatch.setattr(
+        api_client,
+        "listar_brechas",
+        lambda min_score=None, limit=50: {"total": 3, "acima_do_corte": 1, "items": [BRECHA]},
+    )
     monkeypatch.setattr(api_client, "detalhar_canal", lambda channel_id: DETALHE)
     monkeypatch.setattr(api_client, "historico_canal", lambda channel_id, days=None: HISTORICO)
     monkeypatch.setattr(
@@ -281,7 +306,7 @@ def test_tela_visao_geral_renderiza():
 
 @pytest.mark.parametrize(
     "tela",
-    ["tela_visao_geral", "tela_canais", "tela_detalhe", "tela_nichos", "tela_alertas"],
+    ["tela_visao_geral", "tela_canais", "tela_detalhe", "tela_nichos", "tela_alertas", "tela_brechas"],
 )
 def test_cada_tela_renderiza_sem_excecao(tela):
     app = rodar_tela(tela)
@@ -607,3 +632,32 @@ def test_visao_geral_denuncia_coleta_que_falhou(monkeypatch):
     erros = " ".join(bloco.value for bloco in app.error)
     assert "A última coleta falhou" in erros
     assert "cota esgotada" in erros
+
+
+def test_tela_brechas_mostra_candidata_com_a_prova():
+    """A entrega final da metodologia: nenhuma brecha aparece sem a evidência
+    que a sustenta (mesma regra dos sinais de monetização)."""
+    app = rodar_tela("tela_brechas")
+
+    assert not app.exception
+    texto = " ".join(bloco.value for bloco in app.markdown)
+    assert "esconderijos" in texto, "o vídeo que provou a demanda precisa aparecer"
+    assert "Polônia" in texto, "o mercado sugerido precisa aparecer"
+
+
+def test_tela_brechas_declara_quantas_ficaram_abaixo_do_corte():
+    """Esconder ruído sem dizer que existe seria enganoso — o chefe decide
+    direto, sem curadoria prévia (docs/00b)."""
+    app = rodar_tela("tela_brechas")
+
+    legendas = " ".join(bloco.value for bloco in app.caption)
+    assert "abaixo" in legendas and "2" in legendas
+
+
+def test_tela_brechas_declara_a_pergunta_que_nao_responde():
+    """A 4ª das "4 perguntas" não é automatizável; a tela precisa dizer isso em
+    vez de deixar parecer que o score já resolveu tudo."""
+    app = rodar_tela("tela_brechas")
+
+    avisos = " ".join(bloco.value for bloco in app.warning)
+    assert "faz sentido neste país" in avisos

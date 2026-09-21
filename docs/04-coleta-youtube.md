@@ -84,6 +84,8 @@ A conta que decide o desenho: validar uma brecha em 5 mercados por busca custa 5
 
 ## Aviso operacional
 
+> **Correção de 2026-09-21:** medindo o consumo real com `GET /coletas`, o sistema usa **~1.000 das 10.000 unidades diárias** — há folga de 9.000. O aviso abaixo, escrito em 14/09, estava desatualizado. A camada de oportunidade nasceu dentro da folga: o mapeamento de brechas custa ~303 unidades por execução. A estratégia de "caro só no fim" continua valendo — ela é o que mantém o consumo baixo — mas a cota não é o bloqueio que se supunha.
+
 **A cota já estoura hoje, antes desta camada existir.** Em 2026-09-14 a busca sob demanda respondeu "cota do dia estourou" tendo gasto 100 unidades e encontrado zero canais — a busca por nicho ficou sem combustível enquanto a coleta barata de vídeos em alta (1 unidade) seguia funcionando.
 
 Isso precisa ser resolvido **antes** de multiplicar mercados, senão a camada nova nasce sem cota para rodar. As saídas estão listadas como pergunta em aberto em `00b`: mais chaves, menos mercados por ciclo, ou ciclos mais espaçados. O endpoint `GET /coletas` e o aviso na Visão Geral mostram o consumo real por execução — é por ali que se acompanha.

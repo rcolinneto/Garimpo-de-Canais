@@ -9,12 +9,14 @@ from sqlalchemy import func
 from src.api import queries
 from src.api.schemas import (
     AlertaConfig,
+    Brecha,
     AlertaEnviado,
     BuscaAgoraResposta,
     CanalDetalhe,
     CanalItem,
     ExecucaoDeColeta,
     HistoricoCanal,
+    ListaBrechas,
     ListaCanais,
     NichoCreate,
     NichoHistoricoPonto,
@@ -430,6 +432,26 @@ def outliers_do_canal(
         )
         for row in linhas
     ]
+
+
+@app.get("/brechas", response_model=ListaBrechas)
+def listar_brechas(
+    min_score: float | None = Query(None, description="Corte de score; abaixo dele não aparece"),
+    limit: int = Query(50, ge=1, le=200),
+    session=Depends(get_session),
+) -> ListaBrechas:
+    """Tela 6 — brechas candidatas, ordenadas por score.
+
+    Devolve também quantas existem no total, para a tela poder dizer quantas
+    ficaram abaixo do corte. Esconder ruído sem avisar que ele existe seria
+    enganoso (docs/00b).
+    """
+    linhas = queries.opportunities(session, min_score, limit)
+    return ListaBrechas(
+        total=queries.count_opportunities(session),
+        acima_do_corte=queries.count_opportunities(session, min_score),
+        items=[Brecha(**dict(linha._mapping)) for linha in linhas],
+    )
 
 
 @app.get("/coletas", response_model=list[ExecucaoDeColeta])
