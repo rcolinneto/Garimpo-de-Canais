@@ -177,6 +177,14 @@ class ExecucaoDeColeta(BaseModel):
     error_message: str | None
 
 
+class PecaDoTitulo(BaseModel):
+    """Peça reconhecida na anatomia do título (passo DISSECAR)."""
+
+    signal_type: str
+    evidence: str | None = None
+    confidence: float | None = None
+
+
 class VideoOutlierItem(BaseModel):
     """Um vídeo que performou acima da média do próprio canal (Tela 3).
 
@@ -193,3 +201,4 @@ class VideoOutlierItem(BaseModel):
     recency_weight: float | None
     outlier_score: float | None
     breakdown: dict | None
+    pecas_do_titulo: list[PecaDoTitulo] = []

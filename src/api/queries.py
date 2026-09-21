@@ -18,6 +18,7 @@ from src.db.models import (
     ChannelSnapshot,
     MonetizationSignal,
     Niche,
+    TitleSignal,
     Video,
     VideoOutlier,
 )
@@ -346,3 +347,26 @@ def channel_outliers(session, channel_id: int, limit: int = 10):
         .order_by(ultimos.c.outlier_score.desc().nullslast())
         .limit(limit)
     ).all()
+
+
+def title_signals_by_video(session, youtube_video_ids: list[str]) -> dict[str, list[dict]]:
+    """Peças do título por vídeo, para a Tela 3 mostrar junto do outlier."""
+    if not youtube_video_ids:
+        return {}
+    linhas = session.execute(
+        select(
+            Video.youtube_video_id,
+            TitleSignal.signal_type,
+            TitleSignal.evidence,
+            TitleSignal.confidence,
+        )
+        .join(TitleSignal, TitleSignal.video_id == Video.id)
+        .where(Video.youtube_video_id.in_(youtube_video_ids))
+        .order_by(TitleSignal.confidence.desc())
+    ).all()
+    por_video: dict[str, list[dict]] = {}
+    for video_id, signal_type, evidence, confidence in linhas:
+        por_video.setdefault(video_id, []).append(
+            {"signal_type": signal_type, "evidence": evidence, "confidence": confidence}
+        )
+    return por_video

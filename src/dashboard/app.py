@@ -93,6 +93,21 @@ def rotulo_sinal(slug: str) -> str:
     return SIGNAL_LABELS.get(slug, slug)
 
 
+# Peças da anatomia do título (docs/05, passo DISSECAR da Brecha Viral).
+PECAS_DO_TITULO = {
+    "numero_alto": "Número alto",
+    "autoridade_emprestada": "Autoridade emprestada",
+    "gatilho_medo": "Gatilho de medo",
+    "gatilho_desejo": "Gatilho de desejo",
+    "gatilho_curiosidade": "Gatilho de curiosidade",
+    "promessa_negativa": "Promessa negativa",
+}
+
+
+def rotulo_peca(slug: str) -> str:
+    return PECAS_DO_TITULO.get(slug, slug)
+
+
 # Opção do filtro de nicho da Tela 2 para os canais que a coleta de "vídeos em
 # alta" (docs/04) cadastra sem nicho, por não virem da busca por palavras-chave.
 OPCAO_SEM_NICHO = "Sem nicho (vídeos em alta)"
@@ -825,6 +840,40 @@ def tela_detalhe() -> None:
             use_container_width=True,
             hide_index=True,
         )
+        with st.expander("Anatomia dos títulos — o que faz cada um funcionar"):
+            st.caption(
+                "As peças reconhecidas no título, com o trecho exato que disparou "
+                "cada uma. É isso que se replica ao ocupar a brecha: o formato, "
+                "não o assunto."
+            )
+            algum = False
+            for o in interessantes:
+                if not o.get("pecas_do_titulo"):
+                    continue
+                algum = True
+                st.markdown(f"**{html.escape(o['title'] or '—')}**")
+                st.markdown(
+                    '<div class="gc-signal-grid">'
+                    + "".join(
+                        '<div class="gc-signal-card">'
+                        '<div class="gc-signal-card-head">'
+                        f'<span class="gc-signal-type">{html.escape(rotulo_peca(p["signal_type"]))}</span>'
+                        f'<span class="gc-signal-meta">confiança {_arredondar(p["confidence"])}</span>'
+                        "</div>"
+                        f'<div class="gc-signal-evidence">{html.escape(p["evidence"] or "—")}</div>'
+                        "</div>"
+                        for p in o["pecas_do_titulo"]
+                    )
+                    + "</div>",
+                    unsafe_allow_html=True,
+                )
+            if not algum:
+                st.info(
+                    "Nenhuma peça reconhecida nestes títulos. O reconhecimento "
+                    "cobre português, inglês e espanhol — um título em outro "
+                    "idioma pode ter estrutura sem que o sistema saiba lê-la."
+                )
+
         with st.expander("Como esse número é calculado?"):
             st.markdown(
                 "O score compara as views do vídeo com a **média dos outros** vídeos "

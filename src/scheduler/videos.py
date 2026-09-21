@@ -17,8 +17,9 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from src.db.models import Video, VideoOutlier, VideoSnapshot
+from src.db.models import TitleSignal, Video, VideoOutlier, VideoSnapshot
 from src.enrichment.outliers import VideoParaOutlier, calcular_outlier
+from src.enrichment.title_anatomy import detect_title_signals
 
 logger = logging.getLogger(__name__)
 
@@ -131,9 +132,37 @@ def persistir_videos(
                 comment_count=item["comment_count"],
             )
         )
+        _persistir_sinais_de_titulo(session, video)
         videos.append(video)
 
     return videos
+
+
+def _persistir_sinais_de_titulo(session, video: Video) -> None:
+    """Grava as peças do título ainda não registradas para este vídeo.
+
+    Sem duplicar: o título raramente muda, e o snapshot roda todo dia — sem
+    esta checagem o mesmo sinal viraria uma linha nova por dia.
+    """
+    if not video.title:
+        return
+    ja_gravados = {
+        tipo
+        for (tipo,) in session.execute(
+            select(TitleSignal.signal_type).where(TitleSignal.video_id == video.id)
+        ).all()
+    }
+    for sinal in detect_title_signals(video.title):
+        if sinal.signal_type in ja_gravados:
+            continue
+        session.add(
+            TitleSignal(
+                video_id=video.id,
+                signal_type=sinal.signal_type,
+                evidence=sinal.evidence,
+                confidence=sinal.confidence,
+            )
+        )
 
 
 def _ultimas_views(session, video_ids: list[int]) -> dict[int, int | None]:

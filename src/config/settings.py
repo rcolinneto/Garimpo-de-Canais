@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # faz 380 views, um vídeo de 4 mil vira "11x a média" sem provar que o
     # formato funciona. Abaixo deste piso a comparação é percentual sem lastro.
     outlier_min_baseline_views: int = 5_000
+    # A partir de que valor um número no título conta como "promessa
+    # quantificada". Abaixo disso ("3 dicas") o número não carrega a promessa.
+    title_min_number: int = 5
     # Meia-vida do peso de recência, em dias: aos 30 dias o vídeo vale metade.
     outlier_recency_halflife_days: float = 30.0
     # Piso do peso de recência — um outlier antigo perde prioridade, mas não

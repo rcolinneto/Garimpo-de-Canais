@@ -119,6 +119,9 @@ class Video(Base):
     outliers: Mapped[list["VideoOutlier"]] = relationship(
         back_populates="video", cascade="all, delete-orphan"
     )
+    title_signals: Mapped[list["TitleSignal"]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
 
 
 class VideoSnapshot(Base):
@@ -172,6 +175,29 @@ class VideoOutlier(Base):
     breakdown: Mapped[dict | None] = mapped_column(JSONB)
 
     video: Mapped[Video] = relationship(back_populates="outliers")
+
+
+class TitleSignal(Base):
+    """Peça reconhecida na anatomia do título (docs/05, passo DISSECAR).
+
+    Mesmo molde de `MonetizationSignal`: padrão + evidência + confiança. A
+    evidência é o trecho exato do título que disparou a detecção, para quem
+    olha poder discordar do sistema com o dado na mão.
+    """
+
+    __tablename__ = "title_signals"
+    __table_args__ = (Index("ix_title_signals_video_id", "video_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    detected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    signal_type: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[str | None] = mapped_column(Text)
+    confidence: Mapped[float | None] = mapped_column(Numeric)
+
+    video: Mapped[Video] = relationship(back_populates="title_signals")
 
 
 class MonetizationSignal(Base):

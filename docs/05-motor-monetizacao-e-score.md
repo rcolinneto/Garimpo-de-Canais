@@ -118,6 +118,10 @@ Heurísticas no mesmo molde das de monetização: padrão reconhecido, **evidên
 
 Cada lista de vocabulário é configurável, pelo mesmo motivo das regras de monetização: gíria e formato mudam, e o chefe precisa poder ajustar sem mexer em código (ver cadência em `10-validacao-e-ajustes.md`).
 
+**Multilíngue desde o início, e ainda incompleto.** A metodologia existe para levar um formato de um idioma para outro — uma heurística só em português seria cega justamente onde ela precisa enxergar, e os títulos já coletados incluem inglês e espanhol. Cobertura hoje: **PT, EN, ES**. Os mercados decididos em `00b` incluem alemão, italiano e polonês: esse vocabulário **precisa entrar antes da Fase 9 colocar esses mercados no ar**, senão o sistema dirá "nenhuma peça reconhecida" quando na verdade não sabe ler o idioma — silêncio que parece resposta.
+
+**O que `numero_alto` descarta de propósito** (ajustes que vieram de falsos positivos reais, não do papel): números que são data (`2026`), valores em dinheiro (`R$3.847` — o separador de milhar furava a exclusão de moeda) e medidas (`65 anos`, `500 reais`). Nenhum deles é promessa quantificada, e cada um aparecia como sinal com evidência anexada — que é pior que não detectar nada, porque dá aparência de prova a um acaso.
+
 **Fora daqui de propósito:** "objeto concreto" é peça da metodologia mas não vira heurística — distinguir concreto de abstrato exige compreensão semântica, e uma regra por lista de palavras erraria tanto que o sinal perderia valor. Fica como leitura humana.
 
 ## Opportunity score

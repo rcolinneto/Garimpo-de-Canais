@@ -413,8 +413,11 @@ def outliers_do_canal(
     Passo GARIMPAR da metodologia Brecha Viral (docs/00b). Devolve o cálculo
     junto com a nota para a tela poder explicar o número.
     """
+    linhas = queries.channel_outliers(session, channel_id, limit)
+    pecas = queries.title_signals_by_video(session, [row.youtube_video_id for row in linhas])
     return [
         VideoOutlierItem(
+            pecas_do_titulo=pecas.get(row.youtube_video_id, []),
             youtube_video_id=row.youtube_video_id,
             title=row.title,
             published_at=row.published_at,
@@ -425,7 +428,7 @@ def outliers_do_canal(
             outlier_score=row.outlier_score,
             breakdown=row.breakdown,
         )
-        for row in queries.channel_outliers(session, channel_id, limit)
+        for row in linhas
     ]
 
 

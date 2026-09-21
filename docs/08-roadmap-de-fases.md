@@ -100,11 +100,13 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 **Prompt sugerido**:
 > Leia a seção "Camada de oportunidade" de `docs/05-motor-monetizacao-e-score.md` e as tabelas `videos`, `video_snapshots` e `video_outliers` de `docs/03-modelo-de-dados.md`. Implemente a coleta por vídeo e o cálculo de outlier_score. Aproveite o que já existe: `channel_snapshots.avg_views_last_n_videos` é a linha de base, e `raw_payload.recent_videos` já tem os vídeos históricos. Use `videos.list` em lote (até 50 IDs por unidade de cota).
 
-### Fase 8 — Anatomia do título
+### Fase 8 — Anatomia do título ✅ concluída em 2026-09-21
 
 **Objetivo**: o passo DISSECAR — quebrar o formato do vídeo em peças reconhecíveis.
 
 **Entregáveis**: tabela `title_signals`; heurísticas por lista configurável para os seis `signal_type` documentados; exibição das peças reconhecidas com a evidência (o trecho exato do título) na Tela 3.
+
+**Resultado**: 374 peças reconhecidas em 334 dos 845 vídeos, sem custo de cota (o título já estava no banco). Distribuição: curiosidade 101, desejo 95, número alto 93, medo 52, promessa negativa 29, autoridade emprestada 4. Dois falsos positivos de `numero_alto` foram encontrados validando com dados reais e corrigidos — valor em dinheiro e medida de tempo — o que removeu 27 detecções erradas.
 
 **Prompt sugerido**:
 > Leia "Anatomia do título" em `docs/05-motor-monetizacao-e-score.md`. Implemente a detecção no mesmo molde de `src/enrichment/monetization.py`: padrão, evidência anexada e confiança. Lembre que "objeto concreto" foi deliberadamente deixado de fora — não invente heurística para ele.

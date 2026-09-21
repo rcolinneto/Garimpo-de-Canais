@@ -33,12 +33,14 @@ def modelos_para_limpar():
         ChannelSnapshot,
         MonetizationSignal,
         Niche,
+        TitleSignal,
         Video,
         VideoOutlier,
         VideoSnapshot,
     )
 
     return (
+        TitleSignal,
         VideoOutlier,
         VideoSnapshot,
         Video,
