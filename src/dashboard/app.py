@@ -322,6 +322,7 @@ SEGUNDOS_DE_CACHE = 120
 LEITURAS_CACHEAVEIS = {
     "ranking_de_nichos",
     "listar_coletas",
+    "outliers_do_canal",
     "listar_canais",
     "detalhar_canal",
     "historico_canal",
@@ -795,6 +796,56 @@ def tela_detalhe() -> None:
     if canal["score_breakdown"]:
         with st.expander("Por que este canal tem esse score?"):
             st.json(canal["score_breakdown"])
+
+    st.divider()
+    eyebrow("Brecha viral")
+    st.subheader("Vídeos que fugiram da média do canal")
+    st.caption(
+        "Passo GARIMPAR da metodologia: um vídeo muito acima da média do **próprio** "
+        "canal é sinal de que algo específico nele funcionou — é esse formato que "
+        "vale dissecar. A comparação é sempre interna ao canal."
+    )
+    outliers = carregar(api_client.outliers_do_canal, channel_id) or []
+    interessantes = [o for o in outliers if (o["outlier_score"] or 0) > 0]
+    if interessantes:
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Vídeo": o["title"],
+                        "Acima da média": f'{_arredondar(o["outlier_ratio"])}x',
+                        "Views": (o.get("breakdown") or {}).get("views"),
+                        "Média do canal": _arredondar(o["baseline_views"]),
+                        "Publicado": (o["published_at"] or "")[:10],
+                        "Score": _arredondar(o["outlier_score"]),
+                    }
+                    for o in interessantes
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        with st.expander("Como esse número é calculado?"):
+            st.markdown(
+                "O score compara as views do vídeo com a **média dos outros** vídeos "
+                "do canal — o próprio vídeo fica fora da média, senão um pico infla "
+                "justamente a referência que deveria julgá-lo. Shorts só são "
+                "comparados com Shorts. O resultado é depois ponderado pela idade: "
+                "um pico de hoje é oportunidade, o mesmo pico de meses atrás é "
+                "história."
+            )
+            st.json([o.get("breakdown") for o in interessantes[:3]])
+    elif outliers:
+        st.info(
+            "Nenhum vídeo deste canal se destacou da própria média — o desempenho é "
+            "parelho entre os vídeos. Isso não é defeito do canal, só significa que "
+            "não há um formato isolado para dissecar aqui."
+        )
+    else:
+        st.info(
+            "Ainda não há vídeos suficientes deste canal para comparar. O cálculo "
+            "precisa de pelo menos dois vídeos para existir uma média."
+        )
 
     st.divider()
     eyebrow("Conteúdo recente")

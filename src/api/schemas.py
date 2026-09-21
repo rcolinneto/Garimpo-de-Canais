@@ -175,3 +175,21 @@ class ExecucaoDeColeta(BaseModel):
     items_processed: int | None
     api_units_consumed: int | None
     error_message: str | None
+
+
+class VideoOutlierItem(BaseModel):
+    """Um vídeo que performou acima da média do próprio canal (Tela 3).
+
+    Traz o cálculo junto, não só a nota: quem olha precisa poder conferir contra
+    o que o vídeo foi comparado (docs/09 — nada de caixa-preta).
+    """
+
+    youtube_video_id: str
+    title: str | None
+    published_at: datetime | None
+    duration_seconds: int | None
+    outlier_ratio: float | None
+    baseline_views: float | None
+    recency_weight: float | None
+    outlier_score: float | None
+    breakdown: dict | None

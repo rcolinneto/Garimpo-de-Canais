@@ -18,6 +18,8 @@ from src.db.models import (
     ChannelSnapshot,
     MonetizationSignal,
     Niche,
+    Video,
+    VideoOutlier,
 )
 
 
@@ -302,5 +304,45 @@ def collection_runs(session, limit: int = 20):
             CollectionRun.error_message,
         )
         .order_by(CollectionRun.started_at.desc())
+        .limit(limit)
+    ).all()
+
+
+def channel_outliers(session, channel_id: int, limit: int = 10):
+    """Vídeos do canal ordenados por outlier_score, com o cálculo mais recente.
+
+    DISTINCT ON pega só o último cálculo de cada vídeo: `video_outliers` é série
+    temporal (o outlier muda conforme canal e vídeo evoluem), e a tela quer o
+    retrato de agora.
+    """
+    ultimos = (
+        select(
+            VideoOutlier.video_id.label("video_id"),
+            VideoOutlier.outlier_ratio.label("outlier_ratio"),
+            VideoOutlier.baseline_views.label("baseline_views"),
+            VideoOutlier.recency_weight.label("recency_weight"),
+            VideoOutlier.outlier_score.label("outlier_score"),
+            VideoOutlier.breakdown.label("breakdown"),
+        )
+        .distinct(VideoOutlier.video_id)
+        .order_by(VideoOutlier.video_id, VideoOutlier.calculated_at.desc())
+        .subquery("ultimo_outlier")
+    )
+    return session.execute(
+        select(
+            Video.youtube_video_id,
+            Video.title,
+            Video.published_at,
+            Video.duration_seconds,
+            ultimos.c.outlier_ratio,
+            ultimos.c.baseline_views,
+            ultimos.c.recency_weight,
+            ultimos.c.outlier_score,
+            ultimos.c.breakdown,
+        )
+        .select_from(Video)
+        .join(ultimos, ultimos.c.video_id == Video.id)
+        .where(Video.channel_id == channel_id)
+        .order_by(ultimos.c.outlier_score.desc().nullslast())
         .limit(limit)
     ).all()

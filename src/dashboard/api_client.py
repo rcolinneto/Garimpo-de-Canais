@@ -165,6 +165,11 @@ def config_de_alertas() -> dict:
     return _requisitar("GET", "/alertas/config")
 
 
+def outliers_do_canal(channel_id: int, limit: int = 10) -> list[dict]:
+    """Vídeos do canal acima da média dele mesmo (Brecha Viral, passo GARIMPAR)."""
+    return _requisitar("GET", f"/canais/{channel_id}/outliers", params={"limit": limit})
+
+
 def listar_coletas(limit: int = 20) -> list[dict]:
     """Últimas rodadas de coleta — mostra se os jobs estão mesmo rodando."""
     return _requisitar("GET", "/coletas", params={"limit": limit})

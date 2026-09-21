@@ -424,9 +424,12 @@ class YouTubeCollector:
             return []
 
         # videos.list aceita até 50 IDs por chamada, sempre por 1 unidade.
+        # `contentDetails` entra de graça: o custo de videos.list é por chamada,
+        # não por parte. É de lá que vem a duração, que separa Short de vídeo
+        # longo no cálculo de outlier (docs/05).
         videos = self._execute(
             lambda service: service.videos().list(
-                part="snippet,statistics", id=",".join(video_ids[:50])
+                part="snippet,statistics,contentDetails", id=",".join(video_ids[:50])
             ),
             VIDEOS_LIST_COST,
         )

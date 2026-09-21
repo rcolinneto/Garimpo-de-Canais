@@ -56,6 +56,23 @@ class Settings(BaseSettings):
     discovery_max_subscribers: int = 100_000
     discovery_min_view_subscriber_ratio: float = 1.0
 
+    # --- Camada de oportunidade (Brecha Viral, docs/00b e docs/05) ---
+    # Até quantos segundos um vídeo conta como Short. Shorts e vídeos longos têm
+    # distribuições de views incomparáveis: só comparamos cada um com os seus.
+    short_max_duration_seconds: int = 180
+    # Ratio que vale nota 100. A escala é logarítmica: sem isso um vídeo com
+    # 1000x a média pontuava igual a um com 11x, e só a recência diferenciava.
+    outlier_ratio_teto: float = 100.0
+    # Piso do denominador, pelo mesmo motivo do growth_min_base: num canal que
+    # faz 380 views, um vídeo de 4 mil vira "11x a média" sem provar que o
+    # formato funciona. Abaixo deste piso a comparação é percentual sem lastro.
+    outlier_min_baseline_views: int = 5_000
+    # Meia-vida do peso de recência, em dias: aos 30 dias o vídeo vale metade.
+    outlier_recency_halflife_days: float = 30.0
+    # Piso do peso de recência — um outlier antigo perde prioridade, mas não
+    # desaparece: ele ainda prova que o formato funciona.
+    outlier_recency_floor: float = 0.1
+
     # Quantos vídeos recentes são analisados por canal em cada snapshot
     recent_videos_count: int = 10
 

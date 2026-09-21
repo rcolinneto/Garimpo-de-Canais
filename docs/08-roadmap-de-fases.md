@@ -89,11 +89,13 @@ Cada fase traz: objetivo, entregáveis esperados, e um prompt pronto para colar 
 >
 > **Atenção antes da Fase 9**: a cota da API já estoura hoje (ver aviso em `04-coleta-youtube.md`). A decisão de `00b` foi manter **uma única chave** e rodar **um mercado por ciclo**, em rodízio — o desenho precisa caber nessa restrição, não contorná-la.
 
-### Fase 7 — Vídeos como entidade e detecção de outlier
+### Fase 7 — Vídeos como entidade e detecção de outlier ✅ concluída em 2026-09-21
 
 **Objetivo**: responder "que vídeo performou muito acima da média do próprio canal", que é o passo GARIMPAR da metodologia.
 
 **Entregáveis**: tabelas `videos`, `video_snapshots` e `video_outliers`; migration; extração dos vídeos que já estão em `channel_snapshots.raw_payload` (o histórico já coletado não se perde); cálculo do outlier ponderado por recência, com Shorts separados de vídeos longos; nova seção na Tela 3 listando os outliers do canal com o porquê do número.
+
+**Resultado**: 845 vídeos e 844 outliers recuperados do histórico **sem gastar uma unidade de cota** — tudo já estava em `channel_snapshots.raw_payload`. Dos 71 canais, 29 têm outlier relevante. A calibragem foi ajustada durante a validação (piso no denominador e escala log, ver `05`), depois que a primeira versão colocou um vídeo de 4 mil views em primeiro lugar.
 
 **Prompt sugerido**:
 > Leia a seção "Camada de oportunidade" de `docs/05-motor-monetizacao-e-score.md` e as tabelas `videos`, `video_snapshots` e `video_outliers` de `docs/03-modelo-de-dados.md`. Implemente a coleta por vídeo e o cálculo de outlier_score. Aproveite o que já existe: `channel_snapshots.avg_views_last_n_videos` é a linha de base, e `raw_payload.recent_videos` já tem os vídeos históricos. Use `videos.list` em lote (até 50 IDs por unidade de cota).

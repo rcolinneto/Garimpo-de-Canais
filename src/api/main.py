@@ -24,6 +24,7 @@ from src.api.schemas import (
     ScorePonto,
     SinalMonetizacao,
     SnapshotPonto,
+    VideoOutlierItem,
     VideoRecente,
 )
 from src.collectors.youtube import QuotaExceededError, YouTubeCollector
@@ -401,6 +402,31 @@ def configuracao_de_alertas() -> AlertaConfig:
         email_configurado=smtp_configurado(),
         destinatarios=destinatarios(),
     )
+
+
+@app.get("/canais/{channel_id}/outliers", response_model=list[VideoOutlierItem])
+def outliers_do_canal(
+    channel_id: int, limit: int = Query(10, ge=1, le=50), session=Depends(get_session)
+) -> list[VideoOutlierItem]:
+    """Tela 3 — vídeos que performaram acima da média do próprio canal.
+
+    Passo GARIMPAR da metodologia Brecha Viral (docs/00b). Devolve o cálculo
+    junto com a nota para a tela poder explicar o número.
+    """
+    return [
+        VideoOutlierItem(
+            youtube_video_id=row.youtube_video_id,
+            title=row.title,
+            published_at=row.published_at,
+            duration_seconds=row.duration_seconds,
+            outlier_ratio=row.outlier_ratio,
+            baseline_views=row.baseline_views,
+            recency_weight=row.recency_weight,
+            outlier_score=row.outlier_score,
+            breakdown=row.breakdown,
+        )
+        for row in queries.channel_outliers(session, channel_id, limit)
+    ]
 
 
 @app.get("/coletas", response_model=list[ExecucaoDeColeta])

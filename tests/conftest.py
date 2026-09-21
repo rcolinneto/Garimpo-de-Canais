@@ -19,3 +19,33 @@ def erro_de_conexao(url: str) -> str | None:
     except Exception as erro:  # noqa: BLE001 - qualquer falha aqui significa "sem banco"
         return str(erro)
     return None
+
+
+# Ordem de limpeza das tabelas: filhos antes dos pais, senão a chave estrangeira
+# bloqueia o delete. Fica aqui, num lugar só, porque três arquivos de teste
+# precisam dela — quando as tabelas de vídeo entraram na Fase 7, cada cópia
+# desatualizada quebrou a suíte inteira contra um banco que já tinha vídeos.
+def modelos_para_limpar():
+    from src.db.models import (
+        AlertSent,
+        Channel,
+        ChannelScore,
+        ChannelSnapshot,
+        MonetizationSignal,
+        Niche,
+        Video,
+        VideoOutlier,
+        VideoSnapshot,
+    )
+
+    return (
+        VideoOutlier,
+        VideoSnapshot,
+        Video,
+        AlertSent,
+        ChannelScore,
+        MonetizationSignal,
+        ChannelSnapshot,
+        Channel,
+        Niche,
+    )

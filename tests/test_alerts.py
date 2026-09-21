@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import create_engine
 
-from tests.conftest import erro_de_conexao
+from tests.conftest import erro_de_conexao, modelos_para_limpar
 from sqlalchemy.orm import sessionmaker
 
 from src.config.settings import settings
@@ -147,7 +147,7 @@ def sessao():
 
     transaction = connection.begin()
     sessao = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")()
-    for modelo in (AlertSent, ChannelScore, MonetizationSignal, ChannelSnapshot, Channel, Niche):
+    for modelo in modelos_para_limpar():
         sessao.query(modelo).delete()
     sessao.flush()
 

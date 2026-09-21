@@ -27,6 +27,7 @@ from src.enrichment.monetization import dedupe_key, detect_signals
 from src.enrichment.scoring import run_enrichment
 from src.scheduler.alerts import alertar_falha_de_job, run_alerts_job
 from src.scheduler.discovery import discover_niche_now, register_candidates, snapshot_row
+from src.scheduler.videos import calcular_outliers_do_canal, persistir_videos
 
 logger = logging.getLogger(__name__)
 
@@ -213,6 +214,13 @@ def run_snapshot_job() -> None:
                         channel.handle = snapshot.channel_ref.handle or channel.handle
                         # Os textos recentes já estão em cache do snapshot: 0 unidades.
                         _persist_monetization_signals(session, channel.id, ref, collector, snapshot)
+                        # Vídeos e outliers (Fase 7) saem do mesmo payload já
+                        # baixado — também sem custo adicional de cota.
+                        persistir_videos(
+                            session, channel.id, snapshot.raw_payload, snapshot.collected_at
+                        )
+                        session.flush()
+                        calcular_outliers_do_canal(session, channel.id)
                 except QuotaExceededError as error:
                     # Interrompe a coleta, mas ainda enriquece o que já foi coletado.
                     status = "partial"

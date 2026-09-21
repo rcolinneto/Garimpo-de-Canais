@@ -25,8 +25,11 @@ from src.db.models import (
     CollectionRun,
     MonetizationSignal,
     Niche,
+    Video,
+    VideoOutlier,
+    VideoSnapshot,
 )
-from tests.conftest import erro_de_conexao
+from tests.conftest import erro_de_conexao, modelos_para_limpar
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localhost:5433/garimpo")
 
@@ -39,7 +42,7 @@ def _limpar(session) -> None:
     Seguro porque tudo roda dentro de uma transação que é revertida no fim do
     teste — os dados reais coletados continuam intactos no banco.
     """
-    for modelo in (AlertSent, ChannelScore, MonetizationSignal, ChannelSnapshot, Channel, Niche):
+    for modelo in modelos_para_limpar():
         session.query(modelo).delete()
     session.flush()
 
@@ -693,3 +696,38 @@ def test_coletas_expoe_o_estado_dos_jobs(api):
     assert coletas[0]["items_processed"] == 37
     assert coletas[1]["status"] == "failed"
     assert coletas[1]["error_message"] == "cota esgotada"
+
+
+def test_outliers_do_canal_expoe_o_calculo_junto_com_a_nota(api):
+    """A tela precisa poder explicar o número, não só mostrá-lo (docs/09)."""
+    client, ids = api
+    session = app.dependency_overrides[get_session]()
+    from src.scheduler.videos import calcular_outliers_do_canal
+
+    canal = ids["canal_top"]
+    for indice, views in enumerate([10_000, 10_000, 10_000, 120_000]):
+        video = Video(
+            channel_id=canal,
+            youtube_video_id=f"UC_vid_{indice}",
+            title=f"Vídeo {indice}",
+            published_at=AGORA - timedelta(days=3),
+            duration_seconds=600,
+        )
+        session.add(video)
+        session.flush()
+        session.add(VideoSnapshot(video_id=video.id, collected_at=AGORA, view_count=views))
+    session.flush()
+
+    assert calcular_outliers_do_canal(session, canal, AGORA) == 4
+    session.flush()
+
+    dados = client.get(f"/canais/{canal}/outliers").json()
+
+    assert dados, "deve devolver os outliers do canal"
+    topo = dados[0]
+    assert topo["title"] == "Vídeo 3", "o vídeo de 120k é o que foge da média"
+    assert topo["outlier_ratio"] > 1
+    assert topo["breakdown"]["views"] == 120_000
+    # A média não pode incluir o próprio vídeo que está sendo julgado.
+    assert topo["baseline_views"] == pytest.approx(10_000)
+    assert session.query(VideoOutlier).count() == 4

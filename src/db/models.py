@@ -56,6 +56,9 @@ class Channel(Base):
     monetization_signals: Mapped[list["MonetizationSignal"]] = relationship(
         back_populates="channel", cascade="all, delete-orphan"
     )
+    videos: Mapped[list["Video"]] = relationship(
+        back_populates="channel", cascade="all, delete-orphan"
+    )
     scores: Mapped[list["ChannelScore"]] = relationship(
         back_populates="channel", cascade="all, delete-orphan"
     )
@@ -83,6 +86,92 @@ class ChannelSnapshot(Base):
     raw_payload: Mapped[dict | None] = mapped_column(JSONB)
 
     channel: Mapped[Channel] = relationship(back_populates="snapshots")
+
+
+class Video(Base):
+    """Um vídeo de um canal monitorado (docs/03 e docs/05, camada de oportunidade).
+
+    Até a Fase 7 os vídeos existiam só dentro de `channel_snapshots.raw_payload`.
+    Viraram tabela porque o outlier é calculado por vídeo, e porque um vídeo
+    precisa ser acompanhado ao longo do tempo — views crescem.
+    """
+
+    __tablename__ = "videos"
+    __table_args__ = (Index("ix_videos_channel_id_published_at", "channel_id", "published_at"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    channel_id: Mapped[int] = mapped_column(ForeignKey("channels.id"), nullable=False)
+    youtube_video_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    title: Mapped[str | None] = mapped_column(Text)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Separa Short de vídeo longo: as distribuições de views não são comparáveis,
+    # e misturá-las produz outlier fantasma (docs/05). Nulo = ainda desconhecido,
+    # o que acontece nos vídeos recuperados do histórico de raw_payload.
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    first_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    channel: Mapped[Channel] = relationship(back_populates="videos")
+    snapshots: Mapped[list["VideoSnapshot"]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+    outliers: Mapped[list["VideoOutlier"]] = relationship(
+        back_populates="video", cascade="all, delete-orphan"
+    )
+
+
+class VideoSnapshot(Base):
+    """Métricas de um vídeo ao longo do tempo.
+
+    Mesma lógica de `channel_snapshots`: sem série temporal não dá para dizer se
+    um vídeo *está* acelerando ou se é antigo e só acumulou views.
+    """
+
+    __tablename__ = "video_snapshots"
+    __table_args__ = (
+        Index("ix_video_snapshots_video_id_collected_at", "video_id", "collected_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    collected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    view_count: Mapped[int | None] = mapped_column(BigInteger)
+    like_count: Mapped[int | None] = mapped_column(BigInteger)
+    comment_count: Mapped[int | None] = mapped_column(BigInteger)
+
+    video: Mapped[Video] = relationship(back_populates="snapshots")
+
+
+class VideoOutlier(Base):
+    """Resultado do cálculo de outlier, por vídeo e por execução do motor.
+
+    Tabela separada (e não coluna em `videos`) pelo mesmo motivo de
+    `channel_scores`: o valor muda conforme canal e vídeo evoluem, e ver essa
+    evolução importa.
+    """
+
+    __tablename__ = "video_outliers"
+    __table_args__ = (
+        Index("ix_video_outliers_video_id_calculated_at", "video_id", "calculated_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    video_id: Mapped[int] = mapped_column(ForeignKey("videos.id"), nullable=False)
+    calculated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # Guardada para explicabilidade: o dashboard mostra contra o que o vídeo foi
+    # comparado, não só o número final (docs/09 — nada de caixa-preta).
+    baseline_views: Mapped[float | None] = mapped_column(Numeric)
+    outlier_ratio: Mapped[float | None] = mapped_column(Numeric)
+    recency_weight: Mapped[float | None] = mapped_column(Numeric)
+    outlier_score: Mapped[float | None] = mapped_column(Numeric)
+    breakdown: Mapped[dict | None] = mapped_column(JSONB)
+
+    video: Mapped[Video] = relationship(back_populates="outliers")
 
 
 class MonetizationSignal(Base):

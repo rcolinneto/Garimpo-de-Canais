@@ -84,13 +84,20 @@ Heurísticas são explicáveis (importante quando o resultado embasa decisão de
 Um vídeo Outlier performa muito acima da média do **próprio canal**. A comparação é sempre interna: 270 mil views é pouco para um canal que faz 800 mil e é um evento para um que faz 20 mil. Comparar canais entre si não diz nada sobre o que fez aquele vídeo funcionar.
 
 ```
-outlier_ratio  = view_count / baseline_views
-outlier_score  = min(100, (outlier_ratio - 1) * 100 / FATOR) * recency_weight
+denominador    = max(média dos OUTROS vídeos do canal, OUTLIER_MIN_BASELINE_VIEWS)
+outlier_ratio  = view_count / denominador
+outlier_score  = min(100, log10(ratio) / log10(OUTLIER_RATIO_TETO) * 100) * recency_weight
 ```
 
-- `baseline_views` = `channel_snapshots.avg_views_last_n_videos` do snapshot mais recente do canal, **excluindo o próprio vídeo** do cálculo quando possível — senão um vídeo que explodiu infla a média que deveria julgá-lo.
+- A média é a **dos outros vídeos**, nunca incluindo o próprio: senão um vídeo que explodiu infla justamente a referência que deveria julgá-lo, e quanto maior o pico, mais ele se esconde.
 - `outlier_ratio = 1` significa "na média do canal": score 0, não é outlier.
 - `recency_weight` decai com a idade do vídeo. A metodologia é explícita que recência é sinal ("quanto mais recente + mais views, melhor"): um pico de 3 dias atrás é oportunidade, o mesmo pico de 8 meses atrás é história.
+
+**Duas decisões vieram de validar com dados reais na Fase 7, não do desenho em papel:**
+
+*Piso no denominador* (`OUTLIER_MIN_BASELINE_VIEWS`). Sem ele, o vídeo mais bem colocado de toda a base era um de 4.173 views num canal que faz 380 — "11x a média" que não prova nada sobre o formato. É o mesmo raciocínio do `growth_min_base` no score de crescimento: percentual sobre base minúscula é ruído com aparência de sinal.
+
+*Escala logarítmica* em vez de linear com saturação. Na linear, um vídeo com 1155x a média pontuava igual a um com 11x — ambos estouravam o teto, e só a recência os separava. Com log, 1000x continua valendo mais que 11x, sem valer cem vezes mais.
 
 **Vídeos curtos (Shorts) não entram na mesma média que vídeos longos.** As distribuições de views são incomparáveis, e misturar as duas produz outlier fantasma. Por isso `videos.duration_seconds` existe no modelo.
 
