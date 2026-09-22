@@ -70,6 +70,21 @@ DETALHE = CANAL | {
     ],
 }
 
+OUTLIER = {
+    "youtube_video_id": "vid_out",
+    "title": "25 esconderijos que ladrões nunca verificam",
+    "published_at": "2026-09-18T10:00:00+00:00",
+    "duration_seconds": 600,
+    "outlier_ratio": 9.5,
+    "baseline_views": 18_000.0,
+    "recency_weight": 0.93,
+    "outlier_score": 42.1,
+    "breakdown": {"views": 171_526},
+    "pecas_do_titulo": [
+        {"signal_type": "numero_alto", "evidence": "25 esconderijos", "confidence": 0.7}
+    ],
+}
+
 BRECHA = {
     "id": 1,
     "opportunity_score": 72.5,
@@ -158,6 +173,12 @@ def api_falsa(monkeypatch):
         lambda min_score=None, limit=50: {"total": 3, "acima_do_corte": 1, "items": [BRECHA]},
     )
     monkeypatch.setattr(api_client, "detalhar_canal", lambda channel_id: DETALHE)
+    # Sem este mock a Tela 3 fazia chamada de rede real. Passava quando o Docker
+    # estava de pé (a API local respondia) e estourava o timeout quando não —
+    # ou seja, o teste não estava isolado, só parecia estar.
+    monkeypatch.setattr(
+        api_client, "outliers_do_canal", lambda channel_id, limit=10: [OUTLIER]
+    )
     monkeypatch.setattr(api_client, "historico_canal", lambda channel_id, days=None: HISTORICO)
     monkeypatch.setattr(
         api_client,
