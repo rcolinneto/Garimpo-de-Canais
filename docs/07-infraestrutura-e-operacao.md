@@ -20,6 +20,16 @@ A combinação que não exige cartão em lugar nenhum:
 
 Para esse caminho: `SCHEDULER_ENABLED=false` (desliga o APScheduler interno, redundante aqui) e `CRON_SECRET` configurado — os dois endpoints `/cron/*` recusam qualquer chamada sem o segredo certo (fecham por padrão, mesma lógica do `DASHBOARD_PASSWORD`). Os secrets `RENDER_API_URL` e `CRON_SECRET` do workflow ficam em Settings → Secrets and variables → Actions do repositório.
 
+### Migrations: aplicadas na subida da API
+
+Desde 2026-09-23 a API roda `alembic upgrade head` ao subir (`run_migrations_on_startup`, ligado por padrão). Alembic é idempotente — se o banco já está em dia, não faz nada.
+
+**Por que virou automático:** era passo manual, e foi esquecido em três fases seguidas. O resultado em produção foi o pior tipo de falha: **parcial e silenciosa**. Os endpoints antigos continuavam respondendo 200, e só os do schema novo devolviam 500 por tabela inexistente — o sistema parecia no ar, e o problema aparecia como "erro numa aba só".
+
+Se a migration falhar, a API **não cai**: servir o que funciona é melhor que ficar fora do ar inteiro. Mas o log registra `FALHA AO APLICAR MIGRATIONS` em nível ERROR, porque daqui em diante os endpoints do schema novo vão responder 500.
+
+Para quem preferir rodar o Alembic fora do processo da aplicação, basta `RUN_MIGRATIONS_ON_STARTUP=false`.
+
 ### Serviço dormindo: por que não é erro, e como é tratado
 
 O Render desliga um serviço gratuito depois de 15 min sem tráfego. A primeira chamada depois disso não falha de verdade — ela espera dezenas de segundos enquanto o contêiner sobe, e às vezes cai num 502/503/504 do proxy da hospedagem no meio do caminho. Isso é tratado em duas camadas:

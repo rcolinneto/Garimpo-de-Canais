@@ -731,3 +731,54 @@ def test_outliers_do_canal_expoe_o_calculo_junto_com_a_nota(api):
     # A média não pode incluir o próprio vídeo que está sendo julgado.
     assert topo["baseline_views"] == pytest.approx(10_000)
     assert session.query(VideoOutlier).count() == 4
+
+
+def test_migrations_rodam_na_subida_da_api(monkeypatch):
+    """As Fases 7 a 9 criaram seis tabelas e as migrations foram aplicadas só
+    no banco local. Em produção os endpoints novos responderam 500 por tabela
+    inexistente enquanto os antigos funcionavam — falha parcial e silenciosa."""
+    from fastapi.testclient import TestClient as _TestClient
+
+    chamou = []
+    monkeypatch.setattr(api_main, "aplicar_migrations", lambda: chamou.append(1))
+    monkeypatch.setattr(settings, "scheduler_enabled", False)
+    monkeypatch.setattr(settings, "run_migrations_on_startup", True)
+
+    with _TestClient(api_main.app):
+        pass
+
+    assert chamou == [1], "a API precisa deixar o schema em dia antes de servir"
+
+
+def test_falha_de_migration_nao_derruba_a_api(monkeypatch, caplog):
+    """Servir os endpoints que funcionam é melhor que ficar fora do ar inteiro —
+    mas o log precisa gritar, porque o schema novo vai responder 500."""
+    from fastapi.testclient import TestClient as _TestClient
+
+    def _explode():
+        raise RuntimeError("banco inacessível")
+
+    monkeypatch.setattr(api_main, "aplicar_migrations", _explode)
+    monkeypatch.setattr(settings, "scheduler_enabled", False)
+    monkeypatch.setattr(settings, "run_migrations_on_startup", True)
+
+    with caplog.at_level("ERROR"):
+        with _TestClient(api_main.app) as cliente:
+            assert cliente.get("/health").status_code == 200
+
+    assert "FALHA AO APLICAR MIGRATIONS" in caplog.text
+
+
+def test_migrations_podem_ser_desligadas(monkeypatch):
+    """Para quem roda alembic fora do processo da aplicação."""
+    from fastapi.testclient import TestClient as _TestClient
+
+    chamou = []
+    monkeypatch.setattr(api_main, "aplicar_migrations", lambda: chamou.append(1))
+    monkeypatch.setattr(settings, "scheduler_enabled", False)
+    monkeypatch.setattr(settings, "run_migrations_on_startup", False)
+
+    with _TestClient(api_main.app):
+        pass
+
+    assert chamou == []

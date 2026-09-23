@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # de agendamento sempre ligado (docs/07 — deploy gratuito em Render).
     cron_secret: str = ""
 
+    # Aplica as migrations pendentes quando a API sobe. Ligado por padrão: o
+    # passo manual foi esquecido em três fases seguidas e quebrou a produção de
+    # forma parcial e silenciosa. Desligue só se o deploy rodar alembic fora.
+    run_migrations_on_startup: bool = True
+
     # Agendamento dos jobs (cron de 5 campos)
     scheduler_enabled: bool = True
     discovery_cron: str = "0 3 * * *"

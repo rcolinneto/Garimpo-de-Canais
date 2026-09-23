@@ -2,6 +2,7 @@ import hmac
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, Header, HTTPException, Query
 from sqlalchemy import func
@@ -9,8 +10,8 @@ from sqlalchemy import func
 from src.api import queries
 from src.api.schemas import (
     AlertaConfig,
-    Brecha,
     AlertaEnviado,
+    Brecha,
     BuscaAgoraResposta,
     CanalDetalhe,
     CanalItem,
@@ -47,6 +48,28 @@ def get_session():
         yield session
 
 
+def aplicar_migrations() -> None:
+    """Deixa o schema do banco em dia antes de a API começar a servir.
+
+    Existe porque a alternativa é um passo manual que ninguém lembra: as Fases
+    7, 8 e 9 criaram seis tabelas, as migrations foram aplicadas só no banco
+    local, e em produção os endpoints novos responderam 500 por tabela
+    inexistente enquanto os antigos seguiam funcionando — falha silenciosa e
+    parcial, a pior de diagnosticar.
+
+    Alembic é idempotente: se o banco já está em `head`, não faz nada.
+    """
+    from alembic import command
+    from alembic.config import Config
+
+    ini = Path(__file__).resolve().parents[2] / "alembic.ini"
+    if not ini.exists():
+        logger.warning("alembic.ini não encontrado em %s; migrations não aplicadas", ini)
+        return
+    command.upgrade(Config(str(ini)), "head")
+    logger.info("Migrations aplicadas (schema em dia)")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Sobe o APScheduler junto com a API (docs/07-infraestrutura-e-operacao.md).
@@ -54,6 +77,15 @@ async def lifespan(app: FastAPI):
     Uma falha aqui (ex.: cron inválido) não pode derrubar a API: o scheduler é
     opcional para servir dados, e `collection_runs` denuncia se a coleta parou.
     """
+    if settings.run_migrations_on_startup:
+        try:
+            aplicar_migrations()
+        except Exception:  # noqa: BLE001
+            # Não derruba a API: servir os endpoints que funcionam é melhor que
+            # ficar fora do ar inteiro. Mas o log precisa gritar, porque daqui
+            # em diante os endpoints do schema novo vão responder 500.
+            logger.exception("FALHA AO APLICAR MIGRATIONS — o schema pode estar desatualizado")
+
     scheduler = None
     if settings.scheduler_enabled:
         try:
