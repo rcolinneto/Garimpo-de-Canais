@@ -25,7 +25,8 @@ def _resposta_html_de_erro(status_code: int) -> SimpleNamespace:
     def _json():
         raise ValueError("não é JSON")
 
-    return SimpleNamespace(status_code=status_code, json=_json, text=corpo_html)
+    # headers sempre presente: uma resposta real tem, e o cliente lê Retry-After.
+    return SimpleNamespace(status_code=status_code, headers={}, json=_json, text=corpo_html)
 
 
 @pytest.fixture(autouse=True)
@@ -85,7 +86,7 @@ def test_api_acordando_e_esperada_em_vez_de_virar_erro(monkeypatch):
         chamadas.append(1)
         if len(chamadas) <= 2:
             return _resposta_html_de_erro(502)
-        return SimpleNamespace(status_code=200, json=lambda: {"status": "ok"}, text="")
+        return SimpleNamespace(status_code=200, headers={}, json=lambda: {"status": "ok"}, text="")
 
     monkeypatch.setattr(api_client.requests, "request", _request)
 
@@ -102,7 +103,7 @@ def test_erro_de_conexao_tambem_e_reesperado(monkeypatch):
         chamadas.append(1)
         if len(chamadas) == 1:
             raise api_client.requests.ConnectionError("conexão recusada")
-        return SimpleNamespace(status_code=200, json=lambda: {"status": "ok"}, text="")
+        return SimpleNamespace(status_code=200, headers={}, json=lambda: {"status": "ok"}, text="")
 
     monkeypatch.setattr(api_client.requests, "request", _request)
 
@@ -117,7 +118,7 @@ def test_erro_de_negocio_nao_fica_repetindo(monkeypatch, sem_espera):
     def _request(*args, **kwargs):
         chamadas.append(1)
         return SimpleNamespace(
-            status_code=404, json=lambda: {"detail": "Canal não encontrado"}, text=""
+            status_code=404, headers={}, json=lambda: {"detail": "Canal não encontrado"}, text=""
         )
 
     monkeypatch.setattr(api_client.requests, "request", _request)
@@ -164,8 +165,94 @@ def test_resposta_da_api_limpa_a_memoria_de_desistencia(monkeypatch):
     monkeypatch.setattr(
         api_client.requests,
         "request",
-        lambda *a, **k: SimpleNamespace(status_code=200, json=lambda: {"status": "ok"}, text=""),
+        lambda *a, **k: SimpleNamespace(status_code=200, headers={}, json=lambda: {"status": "ok"}, text=""),
     )
 
     assert api_client.health() == {"status": "ok"}
     assert api_client._ultima_desistencia is None
+
+
+def test_429_e_esperado_em_vez_de_virar_erro(monkeypatch):
+    """Achado em produção: "Erro HTTP 429" aparecia em TODAS as abas. 429 é a
+    resposta canônica de "diminua o ritmo", não de "deu errado" — tratá-la como
+    definitiva transformava um estrangulamento momentâneo em tela quebrada."""
+    monkeypatch.setattr(api_client, "INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS", 0)
+    chamadas = []
+
+    def _request(*args, **kwargs):
+        chamadas.append(1)
+        if len(chamadas) == 1:
+            return SimpleNamespace(
+                status_code=429, headers={}, json=lambda: {}, text="Too Many Requests"
+            )
+        return SimpleNamespace(
+            status_code=200, headers={}, json=lambda: {"status": "ok"}, text=""
+        )
+
+    monkeypatch.setattr(api_client.requests, "request", _request)
+
+    assert api_client.health() == {"status": "ok"}
+    assert len(chamadas) == 2
+
+
+def test_429_persistente_vira_mensagem_que_explica_o_que_fazer(monkeypatch, sem_espera):
+    def _429(*args, **kwargs):
+        def _json():
+            raise ValueError("não é JSON")
+
+        return SimpleNamespace(
+            status_code=429, headers={}, json=_json, text="<html>429</html>"
+        )
+
+    monkeypatch.setattr(api_client.requests, "request", _429)
+
+    with pytest.raises(ApiError) as excinfo:
+        api_client.health()
+
+    mensagem = str(excinfo.value)
+    assert "<html>" not in mensagem
+    assert "limitou o número de requisições" in mensagem
+    assert "recarregue" in mensagem
+
+
+def test_retry_after_do_servidor_e_obedecido(monkeypatch):
+    """Ignorar o Retry-After e insistir no intervalo fixo é o que mantém o
+    limite ativo por mais tempo."""
+    esperas = []
+    monkeypatch.setattr(api_client.time, "sleep", lambda s: esperas.append(s))
+    chamadas = []
+
+    def _request(*args, **kwargs):
+        chamadas.append(1)
+        if len(chamadas) == 1:
+            return SimpleNamespace(
+                status_code=429, headers={"Retry-After": "7"}, json=lambda: {}, text=""
+            )
+        return SimpleNamespace(status_code=200, headers={}, json=lambda: {"ok": True}, text="")
+
+    monkeypatch.setattr(api_client.requests, "request", _request)
+
+    api_client.health()
+
+    assert esperas == [7.0], "deve esperar o que o servidor pediu, não o intervalo padrão"
+
+
+def test_retry_after_absurdo_e_limitado(monkeypatch):
+    """Esperar minutos parado é pior que devolver o erro e deixar recarregar."""
+    esperas = []
+    monkeypatch.setattr(api_client.time, "sleep", lambda s: esperas.append(s))
+    chamadas = []
+
+    def _request(*args, **kwargs):
+        chamadas.append(1)
+        if len(chamadas) == 1:
+            return SimpleNamespace(
+                status_code=429, headers={"Retry-After": "3600"}, json=lambda: {}, text=""
+            )
+        return SimpleNamespace(status_code=200, headers={}, json=lambda: {"ok": True}, text="")
+
+    monkeypatch.setattr(api_client.requests, "request", _request)
+
+    api_client.health()
+
+    assert esperas == [api_client.ESPERA_MAXIMA_RETRY_AFTER_SEGUNDOS]

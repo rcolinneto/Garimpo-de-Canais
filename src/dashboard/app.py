@@ -332,7 +332,10 @@ def autenticar() -> bool:
 # por clique, e cada uma é uma ida à rede. Os dados só mudam quando a coleta
 # roda (uma vez por dia), então um TTL curto deixa a tela instantânea sem risco
 # de mostrar coisa velha. Escritas limpam o cache na hora (ver ESCRITAS).
-SEGUNDOS_DE_CACHE = 120
+# 300s e não 120s: a coleta roda uma vez por dia, então cache curto só gera
+# requisição à toa — e requisição à toa foi o que ajudou a estourar o limite
+# de 429 da hospedagem.
+SEGUNDOS_DE_CACHE = 300
 
 LEITURAS_CACHEAVEIS = {
     "ranking_de_nichos",

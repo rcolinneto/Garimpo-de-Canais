@@ -33,7 +33,17 @@ TIMEOUT_BUSCA_AGORA_SEGUNDOS = 180
 # folga, senão a espera termina num erro logo antes de a API ficar pronta.
 ESPERA_MAXIMA_API_ACORDAR_SEGUNDOS = 150
 INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS = 5
-STATUS_API_ACORDANDO = (502, 503, 504)
+# Status que significam "tente de novo daqui a pouco", não "deu errado".
+# 502/503/504: o serviço está subindo depois de ficar ocioso.
+# 429: limite de requisições. É a resposta canônica de "diminua o ritmo" — a
+# hospedagem fica atrás de um CDN que limita por IP de origem, e no Streamlit
+# Cloud esse IP é compartilhado com outros apps. Tratar 429 como erro
+# definitivo transformava um estrangulamento momentâneo em tela quebrada em
+# todas as abas, que foi exatamente o que apareceu em produção.
+STATUS_API_ACORDANDO = (429, 502, 503, 504)
+# Teto para o Retry-After: o servidor pode pedir minutos, e esperar isso
+# parado é pior que devolver o erro e deixar a pessoa recarregar.
+ESPERA_MAXIMA_RETRY_AFTER_SEGUNDOS = 30
 
 # A janela acima vale por TELA, não por requisição. Cada tela faz várias
 # chamadas (a "Visão Geral" faz 2, a "Detalhe do Canal" faz 3), e sem isto a
@@ -64,7 +74,12 @@ def _tratar(resposta: requests.Response) -> Any:
             # ainda está acordando depois de ficar ocioso. Nunca repassar esse
             # HTML cru para a tela: além de poluído, pode conter uma fonte
             # inteira em base64.
-            if resposta.status_code in (502, 503, 504):
+            if resposta.status_code == 429:
+                detalhe = (
+                    "A hospedagem limitou o número de requisições por um instante. "
+                    "Aguarde alguns segundos e recarregue — os dados continuam lá."
+                )
+            elif resposta.status_code in (502, 503, 504):
                 detalhe = (
                     "A API ainda está iniciando (comum após um período ocioso) — "
                     "aguarde alguns segundos e tente novamente."
@@ -79,6 +94,22 @@ def _tratar(resposta: requests.Response) -> Any:
             )
         raise ApiError(detalhe or f"Erro HTTP {resposta.status_code}")
     return resposta.json()
+
+
+def _retry_after(resposta: requests.Response) -> float | None:
+    """Quanto o servidor pediu para esperar, quando ele diz.
+
+    Num 429 o cabeçalho `Retry-After` é a instrução explícita de ritmo;
+    ignorá-la e insistir no intervalo fixo é o que mantém o limite ativo.
+    """
+    valor = resposta.headers.get("Retry-After")
+    if not valor:
+        return None
+    try:
+        segundos = float(valor)
+    except ValueError:
+        return None  # também pode vir como data HTTP; o intervalo padrão serve
+    return max(0.0, min(segundos, ESPERA_MAXIMA_RETRY_AFTER_SEGUNDOS))
 
 
 def _desistiu_ha_pouco() -> bool:
@@ -100,6 +131,7 @@ def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwa
         # Só vale insistir enquanto a janela de espera não estourou; passado
         # isso, o próximo resultado é o definitivo (vira erro na tela).
         insistir = time.monotonic() < limite
+        espera_pedida = None
         try:
             resposta = requests.request(metodo, _url(path), timeout=timeout, **kwargs)
         except requests.RequestException as erro:
@@ -116,7 +148,10 @@ def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwa
                     time.monotonic() if resposta.status_code in STATUS_API_ACORDANDO else None
                 )
                 return _tratar(resposta)
-        time.sleep(INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS)
+            # Num 429 o servidor costuma dizer quanto esperar; obedecer é o que
+            # tira o limite mais rápido do que insistir no intervalo fixo.
+            espera_pedida = _retry_after(resposta)
+        time.sleep(espera_pedida or INTERVALO_ENTRE_TENTATIVAS_SEGUNDOS)
 
 
 def listar_canais(**filtros) -> dict:
