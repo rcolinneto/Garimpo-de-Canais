@@ -37,7 +37,11 @@ from src.db.models import Channel, CollectionRun, Niche
 from src.db.session import SessionLocal
 from src.scheduler.alerts import destinatarios, smtp_configurado
 from src.scheduler.discovery import discover_niche_now
-from src.scheduler.jobs import build_background_scheduler, run_discovery_job, run_snapshot_job
+from src.scheduler.jobs import (
+    build_background_scheduler,
+    run_discovery_job,
+    run_snapshot_job,
+)
 
 configure_logging()
 logger = logging.getLogger(__name__)

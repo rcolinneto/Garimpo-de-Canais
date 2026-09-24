@@ -77,6 +77,16 @@ Depois que um snapshot é gravado, roda:
 
 Detalhado em `05-motor-monetizacao-e-score.md`.
 
+### 3b. Camada de oportunidade (Brecha Viral, Fases 7–9)
+
+Roda em cima da mesma coleta, sem pedir dado novo à API:
+
+- **Outlier** (`enrichment/outliers.py`): compara cada vídeo com a média dos *outros* vídeos do mesmo canal. A linha de base é o `avg_views_last_n_videos` que o snapshot já calculava — é por isso que a camada nasceu com histórico, sem custo de cota.
+- **Anatomia do título** (`enrichment/title_anatomy.py`): reconhece as peças do formato em seis idiomas, no mesmo molde da monetização (regra explícita, evidência anexada).
+- **Brechas** (`scheduler/brechas.py` + `enrichment/opportunities.py`): cruza um formato validado com um mercado onde ele ainda não tem dono. É a única parte que gasta `search.list`, e só para confirmar uma candidata que já passou pelo funil barato.
+
+Decisões e limites em `00b-alinhamento-brecha-viral.md`.
+
 ### 4. Banco de dados
 PostgreSQL guarda: canais, histórico de snapshots (série temporal), sinais de monetização detectados, scores calculados, e metadados de execução dos jobs. Schema completo em `03-modelo-de-dados.md`.
 
@@ -96,26 +106,43 @@ garimpo-de-canais/
       youtube.py
       models.py            # ChannelRef, ChannelSnapshot, ContentSignal
     enrichment/
-      monetization.py
-      scoring.py
+      monetization.py      # sinais de monetização (Fase 3)
+      scoring.py           # score de canal: crescimento + monetização + nicho
+      outliers.py          # vídeo acima da média do próprio canal (Fase 7)
+      title_anatomy.py     # peças do título: número, autoridade, gatilhos (Fase 8)
+      opportunities.py     # score de oportunidade das brechas (Fase 9)
     db/
       models.py
+      seed.py
       migrations/          # Alembic
     scheduler/
-      jobs.py
+      jobs.py              # orquestra o ciclo diário
+      discovery.py         # descoberta de canais
+      videos.py            # persistência de vídeos e cálculo de outlier
+      brechas.py           # mapeamento de brechas por mercado
+      alerts.py
     api/
       main.py               # FastAPI
+      queries.py            # SQL não-trivial, separado das rotas
+      schemas.py
     dashboard/
       app.py                # Streamlit
+      api_client.py         # único caminho até os dados
+      styles.py
     config/
-      niches.yaml           # lista de nichos/keywords configurável
       settings.py
   tests/
+  docs/
+  streamlit_app.py         # entrypoint do Streamlit Cloud (ver docs/07)
+  requirements.txt         # dependências só do dashboard, para o Streamlit Cloud
   docker-compose.yml
   Dockerfile
+  alembic.ini
   .env.example
   pyproject.toml
 ```
+
+> **Desvio consciente:** o `config/niches.yaml` previsto originalmente não existe. Os nichos vivem na tabela `niches` desde a Fase 5, porque o chefe cadastra e edita pelo dashboard — um arquivo no repositório exigiria deploy a cada nicho novo.
 
 ## Decisões de arquitetura e por quê
 

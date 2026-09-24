@@ -21,13 +21,23 @@ from src.collectors.models import ChannelRef
 from src.collectors.youtube import QuotaExceededError, YouTubeCollector
 from src.config.logging import configure_logging
 from src.config.settings import settings
-from src.db.models import Channel, ChannelSnapshot, CollectionRun, MonetizationSignal, Niche
+from src.db.models import (
+    Channel,
+    ChannelSnapshot,
+    CollectionRun,
+    MonetizationSignal,
+    Niche,
+)
 from src.db.session import SessionLocal
 from src.enrichment.monetization import dedupe_key, detect_signals
 from src.enrichment.scoring import run_enrichment
 from src.scheduler.alerts import alertar_falha_de_job, run_alerts_job
-from src.scheduler.discovery import discover_niche_now, register_candidates, snapshot_row
 from src.scheduler.brechas import mapear_brechas
+from src.scheduler.discovery import (
+    discover_niche_now,
+    register_candidates,
+    snapshot_row,
+)
 from src.scheduler.videos import calcular_outliers_do_canal, persistir_videos
 
 logger = logging.getLogger(__name__)

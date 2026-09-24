@@ -9,8 +9,6 @@ poder responder "por que este canal está em primeiro lugar".
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
-
 from src.config.settings import settings
 from src.db.models import Channel, ChannelScore, ChannelSnapshot, MonetizationSignal
 

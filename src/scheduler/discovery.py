@@ -6,7 +6,11 @@ cadastro e filtro de relevância, só mudam o gatilho.
 import logging
 from datetime import datetime, timezone
 
-from src.collectors.youtube import QuotaExceededError, YouTubeCollector, is_relevant_candidate
+from src.collectors.youtube import (
+    QuotaExceededError,
+    YouTubeCollector,
+    is_relevant_candidate,
+)
 from src.db.models import Channel, ChannelSnapshot, Niche
 
 logger = logging.getLogger(__name__)

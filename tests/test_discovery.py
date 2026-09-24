@@ -10,16 +10,22 @@ import os
 
 import pytest
 from sqlalchemy import create_engine
-
-from tests.conftest import erro_de_conexao, modelos_para_limpar
 from sqlalchemy.orm import sessionmaker
 
 from src.collectors.models import ChannelRef
 from src.collectors.youtube import YouTubeCollector
-from src.db.models import AlertSent, Channel, ChannelScore, ChannelSnapshot, MonetizationSignal, Niche
+from src.db.models import (
+    Channel,
+    Niche,
+)
 from src.scheduler.discovery import discover_niche_now, register_candidates
-
-from tests.test_collectors import FakeService, channel_response, quota_error, videos_response
+from tests.conftest import erro_de_conexao, modelos_para_limpar
+from tests.test_collectors import (
+    FakeService,
+    channel_response,
+    quota_error,
+    videos_response,
+)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localhost:5433/garimpo")
 

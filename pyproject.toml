@@ -36,3 +36,28 @@ packages = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# Migrations são geradas pelo template do Alembic e o projeto proíbe editar uma
+# que já foi aplicada (CLAUDE.md). Formatá-las seria brigar com o gerador.
+exclude = ["src/db/migrations/versions"]
+
+[tool.ruff.lint]
+# F: erros reais (import morto, variável não usada, nome indefinido)
+# I: ordem dos imports
+# B: armadilhas conhecidas (bugbear)
+# UP: sintaxe moderna disponível no Python-alvo
+select = ["F", "E9", "I", "B", "UP"]
+ignore = [
+    # Chamada no argumento padrão. É exatamente como o FastAPI declara
+    # Query()/Depends(), então aqui não é armadilha, é a API do framework.
+    "B008",
+    # `datetime.UTC` em vez de `timezone.utc`. Só apelido; trocar em 34 lugares
+    # não corrige nada e polui o histórico do git.
+    "UP017",
+    # `X | None` no lugar de Optional nas assinaturas do FastAPI: a forma antiga
+    # é a que o Pydantic documenta para parâmetros de query.
+    "UP007",
+]

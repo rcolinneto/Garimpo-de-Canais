@@ -12,13 +12,16 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine
-
-from tests.conftest import erro_de_conexao, modelos_para_limpar
 from sqlalchemy.orm import sessionmaker
 
 from src.config.settings import settings
-from src.db.models import AlertSent, Channel, ChannelScore, ChannelSnapshot, MonetizationSignal, Niche
+from src.db.models import (
+    AlertSent,
+    Channel,
+    ChannelScore,
+)
 from src.scheduler import alerts
+from tests.conftest import erro_de_conexao, modelos_para_limpar
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://garimpo:garimpo123@localhost:5433/garimpo")
 AGORA = datetime.now(timezone.utc)

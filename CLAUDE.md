@@ -27,12 +27,15 @@ Trabalhe **uma fase do roadmap por vez** (`docs/08-roadmap-de-fases.md`). Ao fin
 - Banco: PostgreSQL via SQLAlchemy + Alembic. Toda mudança de schema é uma migration nova, nunca editar uma migration já aplicada.
 - Toda a coleta de dados usa a YouTube Data API v3 — respeitar a estratégia de economia de cota descrita em `docs/04-coleta-youtube.md` (search.list é caro, channels.list/videos.list/playlistItems.list são baratos).
 - Segredos (chaves de API, credenciais de banco/SMTP) sempre via variáveis de ambiente (`.env`, nunca commitado); manter `.env.example` atualizado a cada nova variável introduzida.
-- Testes com `pytest` para lógica de coleta, motor de score e endpoints da API. Rodar a suíte antes de considerar uma fase concluída.
+- Testes com `pytest` para lógica de coleta, motor de score e endpoints da API. Rodar a suíte antes de considerar uma fase concluída. Os testes de integração são **pulados** (não falham) quando o Postgres não está de pé; para rodá-los fora do Docker, aponte `DATABASE_URL` para `localhost:5433`.
+- Lint com `ruff check src tests streamlit_app.py` (configurado em `pyproject.toml`). As migrations estão excluídas de propósito: são geradas pelo Alembic e não se edita migration aplicada.
+- `tests/test_documentacao.py` trava o desvio entre código e documentação — tabela ou coluna nova sem entrada em `docs/03`, configuração nova fora do `.env.example`, tela nova sem seção em `docs/06`. Se um desses quebrar, a correção é atualizar a documentação, não afrouxar o teste.
 
 ## Ao terminar uma fase
 
 - Rodar `docker-compose up` e validar manualmente que o que foi construído funciona de ponta a ponta.
 - Rodar o checklist de validação por fase em `docs/10-validacao-e-ajustes.md`.
-- Atualizar `.env.example` se novas variáveis foram introduzidas.
+- Atualizar `.env.example` se novas variáveis foram introduzidas (há teste que cobra isso).
+- **Migrations novas são aplicadas sozinhas** quando a API sobe. Não existe passo manual de deploy para schema — e não deve voltar a existir: ele foi esquecido em três fases seguidas e quebrou a produção de forma parcial e silenciosa (ver `docs/07`).
 - Se a fase revelar necessidade de mudar escopo (não só implementação), registrar isso como uma nova rodada de alinhamento antes de implementar — não mudar o PRD silenciosamente (ver processo de ajuste em `docs/10-validacao-e-ajustes.md`).
 - Resumir no fim da sessão o que foi implementado e qual é a próxima fase, conforme `docs/08-roadmap-de-fases.md`.

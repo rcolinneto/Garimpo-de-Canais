@@ -521,7 +521,7 @@ def test_aquecimento_da_api_dispara_uma_vez_e_nao_derruba_a_tela(monkeypatch):
 
 def test_leitura_repetida_usa_cache_em_vez_de_bater_na_api(monkeypatch):
     """Sem cache, cada clique num filtro refaz todas as chamadas à API."""
-    from src.dashboard.app import _ler_da_api, carregar
+    from src.dashboard.app import _ler_da_api
 
     _ler_da_api.clear()
     chamadas = []

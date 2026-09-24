@@ -199,7 +199,10 @@ def calcular_outliers_do_canal(session, channel_id: int, agora: datetime | None 
     ]
 
     gravados = 0
-    for video, alvo in zip(videos, universo):
+    # strict=True documenta o invariante: `universo` é construído a partir de
+    # `videos`, então têm o mesmo tamanho. Se um refactor quebrar isso, é melhor
+    # estourar do que casar vídeo com o outlier do vizinho em silêncio.
+    for video, alvo in zip(videos, universo, strict=True):
         resultado = calcular_outlier(alvo, universo, agora)
         if resultado is None:
             continue

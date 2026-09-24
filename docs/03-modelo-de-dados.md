@@ -14,6 +14,7 @@ Nichos/temas configurados para monitoramento (o chefe cadastra/edita isso).
 | keywords | text[] | palavras-chave usadas na busca/descoberta |
 | active | boolean | permite pausar um nicho sem apagar histórico |
 | created_at | timestamptz | |
+| last_discovery_at | timestamptz | nullable — sustenta o rodízio entre nichos, já que `search.list` custa 100 unidades e não dá para rodar todos os nichos todo dia |
 
 ## `channels`
 Um canal do YouTube descoberto pelo sistema.

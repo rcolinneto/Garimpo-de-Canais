@@ -6,12 +6,12 @@ testes nessa situação a suíte levava 4 minutos só para dizer "pulado". A
 checagem agora é feita uma vez por URL e reaproveitada.
 """
 
-from functools import lru_cache
+from functools import cache
 
 from sqlalchemy import create_engine
 
 
-@lru_cache(maxsize=None)
+@cache
 def erro_de_conexao(url: str) -> str | None:
     """Devolve a mensagem de erro ao conectar na URL, ou None se conectou."""
     try:

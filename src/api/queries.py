@@ -13,9 +13,9 @@ from src.config.settings import settings
 from src.db.models import (
     AlertSent,
     Channel,
-    CollectionRun,
     ChannelScore,
     ChannelSnapshot,
+    CollectionRun,
     Market,
     MonetizationSignal,
     Niche,
