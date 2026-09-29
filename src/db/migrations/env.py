@@ -3,7 +3,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from src.config.settings import settings
+from src.config.settings import com_driver_explicito, settings
 from src.db import models  # noqa: F401  (registra os modelos em Base.metadata)
 from src.db.base import Base
 
@@ -16,7 +16,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", com_driver_explicito(settings.database_url))
 
 target_metadata = Base.metadata
 

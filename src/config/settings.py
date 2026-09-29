@@ -1,6 +1,24 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def com_driver_explicito(url: str) -> str:
+    """Garante que a URL diga qual driver usar, em vez de confiar no padrão.
+
+    O SQLAlchemy 2.1 mudou o driver padrão de `postgresql://` de psycopg2 para
+    psycopg (v3). Como a dependência não fixa versão exata, uma reconstrução da
+    imagem passou a escolher um driver que não está instalado, e a API parou de
+    subir com `No module named 'psycopg'` — sem que nada no projeto tivesse
+    mudado.
+
+    Normalizar aqui resolve em todos os ambientes sem exigir editar a variável
+    de ambiente de cada um (a de produção fica no painel da hospedagem). URL que
+    já nomeia o driver passa intacta.
+    """
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    return url
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

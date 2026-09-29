@@ -74,3 +74,17 @@ def test_o_numero_de_telas_documentadas_bate_com_o_app():
     assert documentadas == implementadas, (
         f"{documentadas} telas em docs/06 contra {implementadas} no app"
     )
+
+
+def test_url_do_banco_nomeia_o_driver():
+    """O SQLAlchemy 2.1 trocou o driver padrão de `postgresql://` de psycopg2
+    para psycopg v3. Como a dependência não fixa versão, uma reconstrução da
+    imagem passou a escolher um driver ausente e a API parou de subir — sem
+    nenhuma mudança no projeto. Depender de padrão de biblioteca para algo
+    assim é depender de algo que muda sozinho."""
+    from src.config.settings import com_driver_explicito
+
+    assert com_driver_explicito("postgresql://u:p@host/db") == "postgresql+psycopg2://u:p@host/db"
+    # URL que já nomeia o driver passa intacta, inclusive para outro banco.
+    assert com_driver_explicito("postgresql+psycopg://u:p@h/d") == "postgresql+psycopg://u:p@h/d"
+    assert com_driver_explicito("sqlite:///x.db") == "sqlite:///x.db"
