@@ -159,6 +159,11 @@ def listar_canais(**filtros) -> dict:
     return _requisitar("GET", "/canais", params=params)
 
 
+def opcoes_de_canais(limit: int = 500) -> list[dict]:
+    """Lista enxuta para o seletor da Tela 3 — id, nome e inscritos."""
+    return _requisitar("GET", "/canais/opcoes", params={"limit": limit})
+
+
 def detalhar_canal(channel_id: int) -> dict:
     return _requisitar("GET", f"/canais/{channel_id}")
 

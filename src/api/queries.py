@@ -416,3 +416,29 @@ def count_opportunities(session, min_score: float | None = None) -> int:
     if min_score is not None:
         stmt = stmt.where(Opportunity.opportunity_score >= min_score)
     return session.execute(stmt).scalar_one()
+
+
+def channel_options(session, limit: int = 500):
+    """Só o necessário para montar um seletor: id, nome e inscritos.
+
+    Existe porque a Tela 3 baixava a listagem completa (43 KB, com score,
+    crescimento por join lateral e sinais de cada canal) apenas para preencher
+    um dropdown de nomes. Sobre a rede da hospedagem isso é o item mais caro da
+    tela, e nada daquilo aparece no seletor.
+    """
+    ultimo = (
+        select(
+            ChannelSnapshot.channel_id.label("channel_id"),
+            ChannelSnapshot.subscriber_count.label("subscriber_count"),
+        )
+        .distinct(ChannelSnapshot.channel_id)
+        .order_by(ChannelSnapshot.channel_id, ChannelSnapshot.collected_at.desc())
+        .subquery("ultimo_snapshot")
+    )
+    return session.execute(
+        select(Channel.id, Channel.display_name, ultimo.c.subscriber_count)
+        .join(ultimo, ultimo.c.channel_id == Channel.id)
+        .where(Channel.status == "active")
+        .order_by(Channel.display_name)
+        .limit(limit)
+    ).all()

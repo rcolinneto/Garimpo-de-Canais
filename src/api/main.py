@@ -24,6 +24,7 @@ from src.api.schemas import (
     NichoRankingItem,
     NichoResposta,
     NichoUpdate,
+    OpcaoDeCanal,
     ScorePonto,
     SinalMonetizacao,
     SnapshotPonto,
@@ -240,6 +241,21 @@ def listar_canais(
         offset=offset,
         items=[CanalItem(**_canal_base(row, sinais.get(row.id, []))) for row in rows],
     )
+
+
+@app.get("/canais/opcoes", response_model=list[OpcaoDeCanal])
+def opcoes_de_canais(
+    limit: int = Query(500, ge=1, le=2000), session=Depends(get_session)
+) -> list[OpcaoDeCanal]:
+    """Lista enxuta para preencher seletores (Tela 3).
+
+    Declarada ANTES de /canais/{channel_id}: o FastAPI resolve as rotas na
+    ordem de registro, e "opcoes" casaria com o parâmetro de caminho.
+    """
+    return [
+        OpcaoDeCanal(id=linha.id, display_name=linha.display_name, subscriber_count=linha.subscriber_count)
+        for linha in queries.channel_options(session, limit)
+    ]
 
 
 @app.get("/canais/{channel_id}", response_model=CanalDetalhe)

@@ -138,7 +138,7 @@ def _apresentacao() -> None:
     st.markdown(
         """
         <div class="gc-landing-nav">
-          <p class="gc-wordmark">📡 GARIMPO DE CANAIS</p>
+          <p class="gc-wordmark">GARIMPO DE CANAIS</p>
           <div>
             <a href="#como-funciona">Como funciona</a>
             <a href="#perguntas">Perguntas</a>
@@ -146,7 +146,7 @@ def _apresentacao() -> None:
           </div>
         </div>
         <div class="gc-hero">
-          <span class="gc-badge">🛰️ Coleta automática · YouTube Data API v3</span>
+          <span class="gc-badge">Coleta automática · YouTube Data API v3</span>
           <h1>Um radar que acompanha canais do <span class="gc-accent-word">YouTube</span>
               em crescimento, todos os dias, sozinho</h1>
           <p>O sistema procura canais pequenos que estão crescendo dentro dos nichos
@@ -190,18 +190,20 @@ def _apresentacao() -> None:
         '<p class="gc-section-sub">Todos os dias, sem intervenção manual.</p>',
         unsafe_allow_html=True,
     )
+    # Quatro capacidades paralelas, não uma sequência — por isso não levam
+    # numeração. O marcador é uma regra de acento no topo do card, que separa
+    # sem competir com o texto.
     blocos = [
-        ("🔎", "Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho — não recadastra quem já estourou."),
-        ("📈", "Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo, não só o número de hoje."),
-        ("💰", "Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência exata de cada achado."),
-        ("🎯", "Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um único score, para saber o que vale olhar primeiro."),
+        ("Descobre", "Busca canais novos nos nichos configurados e só cadastra os que ainda são pequenos e têm vídeos recentes acima do próprio tamanho — não recadastra quem já estourou."),
+        ("Acompanha", "Guarda um retrato das métricas de cada canal todo dia, formando o histórico que mostra quem está realmente subindo, não só o número de hoje."),
+        ("Detecta monetização", "Procura links de afiliado, infoprodutos, lojas e comunidades pagas nas descrições — e guarda a evidência exata de cada achado."),
+        ("Prioriza", "Combina crescimento, monetização e aquecimento do nicho em um único score, para saber o que vale olhar primeiro."),
     ]
     st.markdown(
         '<div class="gc-grid">'
         + "".join(
-            f'<div class="gc-card"><span class="gc-icon">{icone}</span>'
-            f"<h4>{titulo}</h4><p>{texto}</p></div>"
-            for icone, titulo, texto in blocos
+            f'<div class="gc-card"><h4>{titulo}</h4><p>{texto}</p></div>'
+            for titulo, texto in blocos
         )
         + "</div>",
         unsafe_allow_html=True,
@@ -255,7 +257,7 @@ def _apresentacao() -> None:
     st.markdown(
         """
         <div class="gc-disclaimer">
-          <strong>⚠️ Como isso funciona de verdade</strong>
+          <strong>Como isso funciona de verdade</strong>
           <p>O sistema <strong>estima</strong> monetização por evidência indireta — um link
              de pagamento na descrição, um e-book anunciado. Ele nunca sabe quanto um canal
              de terceiros realmente fatura, e nenhuma ferramenta do mercado sabe isso. Por
@@ -316,7 +318,7 @@ def autenticar() -> bool:
 
     st.markdown(
         '<div class="gc-landing-footer">'
-        "<span>📡 Garimpo de Canais</span>"
+        "<span>Garimpo de Canais</span>"
         "<span>Coleta automática via YouTube Data API v3</span>"
         "</div>",
         unsafe_allow_html=True,
@@ -340,6 +342,7 @@ SEGUNDOS_DE_CACHE = 300
 LEITURAS_CACHEAVEIS = {
     "ranking_de_nichos",
     "listar_coletas",
+    "opcoes_de_canais",
     "listar_brechas",
     "outliers_do_canal",
     "listar_canais",
@@ -493,17 +496,16 @@ def _estado_da_coleta() -> None:
         )
     else:
         st.caption(
-            f"✅ Última coleta: {rotulo} em {quando} — "
+            f"Última coleta: {rotulo} em {quando} — "
             f"{ultima['items_processed'] or 0} itens, "
             f"{ultima['api_units_consumed'] or 0} unidades de cota."
         )
     if falhas and ultima["status"] != "failed":
-        st.caption(f"⚠️ {len(falhas)} das últimas {len(coletas)} coletas falharam.")
+        st.caption(f"{len(falhas)} das últimas {len(coletas)} coletas falharam.")
 
 
 def tela_visao_geral() -> None:
     page_header(
-        "📡",
         "Visão Geral",
         "Em 10 segundos: o que está bombando agora, por nicho monitorado.",
     )
@@ -571,7 +573,6 @@ def tela_visao_geral() -> None:
 
 def tela_canais() -> None:
     page_header(
-        "🔎",
         "Canais Descobertos",
         "A tabela de trabalho — refine pelos filtros ao lado e ordene por score.",
     )
@@ -587,7 +588,7 @@ def tela_canais() -> None:
         | {OPCAO_SEM_NICHO: None}
     )
 
-    with st.expander("🛰️ Buscar novos canais agora no YouTube"):
+    with st.expander("Buscar novos canais agora no YouTube"):
         st.caption(
             "Dispara uma busca de verdade na API do YouTube para o nicho escolhido, sem "
             "esperar o job agendado (roda sozinho às 3h e 5h). Consome cota real da API — "
@@ -604,7 +605,7 @@ def tela_canais() -> None:
             nicho_busca = st.selectbox(
                 "Nicho", list(nichos_ativos.keys()), key="nicho_busca_agora"
             )
-            if st.button("🔎 Buscar agora", type="primary"):
+            if st.button("Buscar agora", type="primary"):
                 with st.spinner(f"Buscando '{nicho_busca}' no YouTube — pode demorar um pouco..."):
                     resultado = carregar(
                         api_client.buscar_nicho_agora, nichos_ativos[nicho_busca]
@@ -631,7 +632,7 @@ def tela_canais() -> None:
                         )
 
     with st.sidebar:
-        st.header("🔧 Filtros")
+        st.header("Filtros")
         st.caption("Combine quantos quiser; a lista se atualiza sozinha.")
         nicho = st.selectbox("Nicho", list(opcoes_nicho.keys()))
         min_subs, max_subs = st.columns(2)
@@ -695,7 +696,7 @@ def tela_canais() -> None:
     )
 
     st.download_button(
-        "⬇️ Exportar CSV da visão atual",
+        "Exportar CSV da visão atual",
         data=tabela.drop(columns=["id"]).to_csv(index=False).encode("utf-8-sig"),
         file_name="canais_garimpados.csv",
         mime="text/csv",
@@ -715,15 +716,15 @@ def tela_canais() -> None:
 
 def tela_detalhe() -> None:
     page_header(
-        "📈",
         "Detalhe do Canal",
         "Evolução ao longo do tempo e a evidência por trás de cada sinal de monetização.",
     )
 
-    dados = carregar(api_client.listar_canais, limit=200)
-    if dados is None:
+    # Lista enxuta de propósito: o seletor precisa de nome e inscritos, não dos
+    # 43 KB da listagem completa (com score, crescimento e sinais de cada canal).
+    itens = carregar(api_client.opcoes_de_canais)
+    if itens is None:
         return
-    itens = dados["items"]
     if not itens:
         st.info("Nenhum canal descoberto ainda.")
         return
@@ -741,7 +742,7 @@ def tela_detalhe() -> None:
         # Construída pelo nosso próprio backend (_channel_url), mas escapamos
         # mesmo assim — sem confiar em "isso nunca teria caractere especial".
         cabecalho.append(
-            f'🔗 <a href="{html.escape(canal["url"])}" target="_blank">Abrir canal no YouTube</a>'
+            f'<a href="{html.escape(canal["url"])}" target="_blank">Abrir canal no YouTube ↗</a>'
         )
     if cabecalho:
         st.markdown(
@@ -927,7 +928,6 @@ def tela_detalhe() -> None:
 
 def tela_nichos() -> None:
     page_header(
-        "⚙️",
         "Configuração de Nichos",
         "Cadastre, edite ou pause nichos sem precisar mexer em código ou pedir ajuda técnica.",
     )
@@ -967,7 +967,7 @@ def tela_nichos() -> None:
             help="São elas que alimentam a busca de descoberta na API do YouTube.",
         )
         ativo = st.checkbox("Ativo", value=True, help="Nichos inativos não entram no rodízio de descoberta.")
-        if st.form_submit_button("➕ Cadastrar nicho", type="primary"):
+        if st.form_submit_button("Cadastrar nicho", type="primary"):
             resultado = carregar(
                 api_client.criar_nicho,
                 name=nome,
@@ -996,7 +996,7 @@ def tela_nichos() -> None:
             value=escolhido["active"],
             help="Desmarcar pausa a descoberta do nicho sem apagar o histórico já coletado.",
         )
-        if st.form_submit_button("💾 Salvar alterações", type="primary"):
+        if st.form_submit_button("Salvar alterações", type="primary"):
             resultado = carregar(
                 api_client.atualizar_nicho,
                 escolhido["niche_id"],
@@ -1014,7 +1014,6 @@ def tela_nichos() -> None:
 
 def tela_alertas() -> None:
     page_header(
-        "🔔",
         "Alertas e Relatórios",
         "Quem já cruzou o limiar de score, e o histórico de avisos disparados por e-mail.",
     )
@@ -1108,13 +1107,12 @@ def tela_alertas() -> None:
 
 def tela_brechas() -> None:
     page_header(
-        "🧩",
         "Brechas",
         "Formatos que já provaram demanda e cujo espaço ainda não foi ocupado.",
     )
 
     with st.sidebar:
-        st.header("🔧 Corte")
+        st.header("Corte")
         st.caption("Abaixo deste score a candidata não aparece na lista.")
         corte = st.slider("Score mínimo", 0.0, 100.0, 40.0, 5.0)
 
@@ -1203,7 +1201,7 @@ def acordar_api_em_segundo_plano() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Garimpo de Canais", page_icon="📡", layout="wide")
+    st.set_page_config(page_title="Garimpo de Canais", page_icon=":material/insights:", layout="wide")
     # A landing (pré-login) é sempre escura, independente do tema do viewer —
     # ver docs em styles.py. O app autenticado continua seguindo claro/escuro.
     inject_css(landing=not st.session_state.get("autenticado"))
@@ -1212,17 +1210,17 @@ def main() -> None:
         return
 
     paginas = [
-        st.Page(tela_visao_geral, title="Visão Geral", icon="📡", default=True),
-        st.Page(tela_canais, title="Canais Descobertos", icon="🔎"),
-        st.Page(tela_detalhe, title="Detalhe do Canal", icon="📈"),
-        st.Page(tela_nichos, title="Configuração de Nichos", icon="⚙️"),
-        st.Page(tela_alertas, title="Alertas e Relatórios", icon="🔔"),
-        st.Page(tela_brechas, title="Brechas", icon="🧩"),
+        st.Page(tela_visao_geral, title="Visão Geral", icon=":material/insights:", default=True),
+        st.Page(tela_canais, title="Canais Descobertos", icon=":material/search:"),
+        st.Page(tela_detalhe, title="Detalhe do Canal", icon=":material/analytics:"),
+        st.Page(tela_nichos, title="Configuração de Nichos", icon=":material/tune:"),
+        st.Page(tela_alertas, title="Alertas e Relatórios", icon=":material/notifications:"),
+        st.Page(tela_brechas, title="Brechas", icon=":material/key:"),
     ]
     # Navegação na barra lateral (posição padrão do st.navigation). A Tela 2
     # soma seus próprios filtros logo abaixo da lista de páginas.
     with st.sidebar:
-        st.caption("🌙 Tema: menu ⋮ → Settings", help="Escolha claro ou escuro no menu do topo direito.")
+        st.caption("Tema: menu de configurações", help="Escolha claro ou escuro no menu do topo direito.")
     st.navigation(paginas).run()
 
 

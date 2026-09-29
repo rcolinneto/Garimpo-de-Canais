@@ -4,7 +4,7 @@ Um único lugar para a aparência evita que cada tela reinvente cor/espaçamento
 — e mantém a customização em CSS puro (sem libs de UI), consistente com a
 filosofia de simplicidade de `docs/09-requisitos-nao-funcionais.md`.
 
-Claro/escuro: o Streamlit já resolve isso nativamente (menu ⋮ → Settings), e é
+Claro/escuro: o Streamlit já resolve isso nativamente (menu de configurações), e é
 o único jeito correto de fazer isso aqui — as tabelas do dashboard são
 desenhadas em <canvas> pela grid interna dele, e só o motor de tema nativo
 sabe redesenhar esses pixels (CSS não alcança canvas). O que falta ao Streamlit
@@ -402,13 +402,15 @@ button[kind="primaryFormSubmit"] p {
     border-radius: var(--gc-radius);
     padding: 1.25rem;
 }
-.gc-card .gc-icon {
-    font-size: 1.6rem;
-    display: inline-block;
-    background: rgba(242, 169, 59, 0.14);
-    border-radius: 10px;
-    padding: 0.4rem 0.55rem;
-    margin-bottom: 0.6rem;
+/* Regra de acento no topo do card, no lugar do pictograma que havia antes:
+   marca o começo de cada bloco sem disputar atenção com o título. */
+.gc-card::before {
+    content: "";
+    display: block;
+    width: 28px;
+    height: 2px;
+    background: var(--gc-accent);
+    margin-bottom: 0.9rem;
 }
 .gc-card h4 {
     margin: 0 0 0.35rem 0;
@@ -583,13 +585,17 @@ def inject_css(landing: bool = False) -> None:
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
-def page_header(icon: str, title: str, subtitle: str | None = None) -> None:
+def page_header(title: str, subtitle: str | None = None) -> None:
     """Cabeçalho padrão de cada tela: mesmo peso visual em todo o sistema.
+
+    Sem ícone de propósito. Um pictograma ao lado de cada título competia com o
+    texto sem acrescentar informação — quem navega já sabe onde está pela
+    lateral. A hierarquia fica por conta da tipografia.
 
     Usa st.title/st.caption de verdade (não HTML solto) para continuar
     acessível e testável — a aparência vem do CSS injetado por `inject_css`.
     """
-    st.title(f"{icon}  {title}")
+    st.title(title)
     if subtitle:
         st.caption(subtitle)
 

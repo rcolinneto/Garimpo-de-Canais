@@ -234,3 +234,11 @@ class ListaBrechas(BaseModel):
     total: int
     acima_do_corte: int
     items: list[Brecha]
+
+
+class OpcaoDeCanal(BaseModel):
+    """Um canal como ele aparece num seletor — nada além disso."""
+
+    id: int
+    display_name: str | None
+    subscriber_count: int | None

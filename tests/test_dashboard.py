@@ -5,6 +5,7 @@ headless — é o que prova que as telas renderizam sem exceção. As chamadas d
 são substituídas por respostas fixas, então nenhum teste depende da API no ar.
 """
 
+import re
 import time
 from pathlib import Path
 
@@ -171,6 +172,16 @@ def api_falsa(monkeypatch):
         api_client,
         "listar_brechas",
         lambda min_score=None, limit=50: {"total": 3, "acima_do_corte": 1, "items": [BRECHA]},
+    )
+    # A Tela 3 usa a lista enxuta para o seletor; sem mock ela vai à rede e o
+    # teste passa a depender do ambiente (foi assim que a suíte foi de 30s para
+    # 3 minutos quando o endpoint nasceu).
+    monkeypatch.setattr(
+        api_client,
+        "opcoes_de_canais",
+        lambda limit=500: [
+            {"id": 1, "display_name": "Canal Teste", "subscriber_count": 1200}
+        ],
     )
     monkeypatch.setattr(api_client, "detalhar_canal", lambda channel_id: DETALHE)
     # Sem este mock a Tela 3 fazia chamada de rede real. Passava quando o Docker
@@ -682,3 +693,32 @@ def test_tela_brechas_declara_a_pergunta_que_nao_responde():
 
     avisos = " ".join(bloco.value for bloco in app.warning)
     assert "faz sentido neste país" in avisos
+
+
+# Faixas de codepoint de emoji/pictograma. Não incluem setas (U+2190–U+21FF,
+# como "→") nem pontuação tipográfica ("—", "·"), que são texto e seguem em uso.
+_EMOJI = re.compile(
+    "[\U0001F300-\U0001FAFF\U0001F1E6-\U0001F1FF☀-⛿✀-➿️⬀-⯿]"
+)
+
+
+def test_a_interface_nao_usa_emoji():
+    """O dono do produto pediu a interface sem emoji. Pictograma colorido no
+    meio de um número é ruído: disputa atenção com o dado e faz a tela parecer
+    protótipo, não relatório. O lugar de ícone aqui é a navegação, via Material
+    Icons (`:material/...:`), que herda a cor do tema em vez de impor a sua.
+
+    Escrito como teste e não como revisão porque emoji volta sozinho: entra num
+    `st.success("... ")` qualquer numa pressa e ninguém vê até o chefe abrir.
+    """
+    raiz = Path(__file__).resolve().parents[1]
+    arquivos = sorted((raiz / "src" / "dashboard").glob("*.py")) + [raiz / "streamlit_app.py"]
+
+    desvios = [
+        f"{arq.relative_to(raiz)}:{n}: {''.join(achados)}"
+        for arq in arquivos
+        for n, linha in enumerate(arq.read_text(encoding="utf-8").splitlines(), 1)
+        if (achados := _EMOJI.findall(linha))
+    ]
+
+    assert not desvios, "emoji na interface:\n" + "\n".join(desvios)

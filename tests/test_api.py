@@ -361,7 +361,11 @@ def banco_do_endpoint_alcancavel():
     """
     falha = erro_de_conexao(settings.database_url)
     if falha:
-        pytest.skip(f"Banco de settings.database_url indisponível: {falha}")
+        pytest.skip(
+            f"Banco de settings.database_url ({settings.database_url.split('@')[-1]}) "
+            f"indisponível. Rode com: DATABASE_URL=postgresql://garimpo:garimpo123"
+            f"@localhost:5433/garimpo pytest — detalhe: {falha.splitlines()[0]}"
+        )
 
 
 def _limpar_logs_de_busca_manual(desde):

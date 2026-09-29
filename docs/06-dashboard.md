@@ -67,3 +67,24 @@ Isso torna a **ordenação crítica**. Sem filtro humano antes, o `opportunity_s
 - O rodapé mostra **quantas candidatas ficaram abaixo do corte**, com a opção de exibi-las. Esconder ruído sem dizer que existe seria enganoso — mesma regra de honestidade que vale para o resto do sistema.
 
 **Regra que vale aqui igual às outras telas**: nenhuma brecha aparece sem a evidência que a sustenta. Um número de oportunidade sem a prova ao lado seria um palpite com aparência de dado.
+
+## Convenções visuais
+
+Decidido em 2026-09-29, a pedido do dono do produto ("design melhor, sem emoji,
+clean").
+
+- **Sem emoji em lugar nenhum da interface.** Pictograma colorido no meio de um
+  número disputa atenção com o dado e faz a tela parecer protótipo, não
+  relatório — e este dashboard é lido por quem vai decidir pauta em cima dele.
+  Travado por teste (`test_a_interface_nao_usa_emoji`), porque emoji volta
+  sozinho: entra num `st.success()` qualquer numa pressa e ninguém percebe até
+  o chefe abrir a tela.
+- **Ícone só na navegação**, via Material Icons do próprio Streamlit
+  (`:material/insights:`, `:material/search:`, …). Eles herdam a cor do tema em
+  vez de impor a sua, então a barra lateral continua legível no claro e no
+  escuro.
+- **Começo de bloco marcado por regra de acento**, não por pictograma: os cards
+  da tela inicial usam `.gc-card::before` (um traço de 28px na cor de destaque).
+  Marca onde cada bloco começa sem competir com o título.
+- **Travessão para dado ausente**, nunca a palavra "None" nem célula vazia — a
+  diferença entre "não coletamos" e "é zero" muda a leitura.
