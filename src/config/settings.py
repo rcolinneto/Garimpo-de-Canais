@@ -52,6 +52,18 @@ class Settings(BaseSettings):
     # de agendamento sempre ligado (docs/07 — deploy gratuito em Render).
     cron_secret: str = ""
 
+    # Segredo que o dashboard manda nas ESCRITAS (criar/editar nicho e a busca
+    # sob demanda). Separado do cron_secret de propósito: são portadores
+    # diferentes — o de cron mora no cron-job.org, este nos secrets do
+    # Streamlit — e um segredo só para dois níveis de confiança significa que
+    # vazar um entrega o outro.
+    #
+    # Existe porque a API é pública: o `buscar-agora` dispara um `search.list`,
+    # que custa 100 das 10.000 unidades diárias. Sem token, ~100 requisições de
+    # qualquer um na internet zeram a coleta do dia inteiro — e a senha do
+    # dashboard nunca protegeu isso, só a interface.
+    api_write_token: str = ""
+
     # Aplica as migrations pendentes quando a API sobe. Ligado por padrão: o
     # passo manual foi esquecido em três fases seguidas e quebrou a produção de
     # forma parcial e silenciosa. Desligue só se o deploy rodar alembic fora.

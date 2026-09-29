@@ -20,6 +20,30 @@ A combinação que não exige cartão em lugar nenhum:
 
 Para esse caminho: `SCHEDULER_ENABLED=false` (desliga o APScheduler interno, redundante aqui) e `CRON_SECRET` configurado — os dois endpoints `/cron/*` recusam qualquer chamada sem o segredo certo (fecham por padrão, mesma lógica do `DASHBOARD_PASSWORD`). Os secrets `RENDER_API_URL` e `CRON_SECRET` do workflow ficam em Settings → Secrets and variables → Actions do repositório.
 
+### Token de escrita da API (obrigatório desde 2026-09-29)
+
+A API e o dashboard são deploys separados e **a API é pública** — a senha do
+dashboard nunca a protegeu. As escritas (`POST /nichos`, `PUT /nichos/{id}` e
+`POST /nichos/{id}/buscar-agora`) agora exigem o cabeçalho `X-Api-Token`.
+
+`API_WRITE_TOKEN` precisa do **mesmo valor nos dois serviços**:
+
+1. Gere o valor: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+2. Na API (painel da hospedagem → Environment): `API_WRITE_TOKEN=<valor>`
+3. No dashboard (Streamlit Cloud → Settings → Secrets): `API_WRITE_TOKEN = "<valor>"`
+
+Falha fechada: **sem a variável configurada, as escritas não funcionam** — a
+Tela 4 (nichos) e o botão "Buscar agora" respondem 401 com uma mensagem
+explicando o que falta. É de propósito; um "libera enquanto não configurar"
+seria o tipo de padrão inseguro que nunca é apertado depois.
+
+Por que não bastava a senha do dashboard: o `buscar-agora` gasta 100 das 10.000
+unidades diárias da YouTube API por chamada. Na revisão de 2026-09-29 um POST
+sem cabeçalho nenhum criou um nicho e disparou uma busca real — 181 unidades em
+20 segundos. Umas 100 requisições de qualquer um na internet zeram a coleta do
+dia, e o sistema fica cego sem dar erro em lugar nenhum.
+
+
 ### Migrations: aplicadas na subida da API
 
 Desde 2026-09-23 a API roda `alembic upgrade head` ao subir (`run_migrations_on_startup`, ligado por padrão). Alembic é idempotente — se o banco já está em dia, não faz nada.

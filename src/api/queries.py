@@ -442,3 +442,39 @@ def channel_options(session, limit: int = 500):
         .order_by(Channel.display_name)
         .limit(limit)
     ).all()
+
+
+def alert_threshold_calibration(session, limiar: float) -> dict:
+    """Distribuição dos scores vigentes, para julgar se o limiar faz sentido.
+
+    Usa o ÚLTIMO score de cada canal, não o histórico inteiro: é sobre ele que
+    o alerta decide. Contar as 277 linhas de `channel_scores` em vez dos 71
+    canais daria um retrato de quantas vezes um canal já foi pontuado, que é
+    outra pergunta.
+    """
+    latest = _latest_scores()
+    score = latest.c.total_score
+
+    linha = session.execute(
+        select(
+            func.count().label("canais_com_score"),
+            func.count(case((score >= limiar, 1))).label("canais_acima_do_limiar"),
+            func.percentile_cont(0.50).within_group(score).label("p50"),
+            func.percentile_cont(0.90).within_group(score).label("p90"),
+            func.percentile_cont(0.99).within_group(score).label("p99"),
+            func.max(score).label("maximo"),
+        ).select_from(latest)
+    ).one()
+
+    def numero(valor):
+        # Numeric do Postgres chega como Decimal e não serializa como float.
+        return round(float(valor), 2) if valor is not None else None
+
+    return {
+        "canais_com_score": linha.canais_com_score,
+        "canais_acima_do_limiar": linha.canais_acima_do_limiar,
+        "score_p50": numero(linha.p50),
+        "score_p90": numero(linha.p90),
+        "score_p99": numero(linha.p99),
+        "score_maximo": numero(linha.maximo),
+    }

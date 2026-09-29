@@ -12,12 +12,14 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from src.config.settings import settings
+from src.config.settings import Settings, settings
 from src.dashboard import api_client
 from src.dashboard.app import formatar_canais
 
 APP = str(Path(__file__).resolve().parents[1] / "src" / "dashboard" / "app.py")
 SENHA = "senha-de-teste"
+
+CALIBRAGEM_LIMIAR_INALCANCAVEL = {"canais_com_score": 71, "canais_acima_do_limiar": 0, "score_p50": 1.81, "score_p90": 7.05, "score_p99": 13.25, "score_maximo": 5.98}
 
 CANAL = {
     "id": 1,
@@ -199,7 +201,12 @@ def api_falsa(monkeypatch):
     monkeypatch.setattr(
         api_client,
         "config_de_alertas",
-        lambda: {"limiar": 50.0, "email_configurado": True, "destinatarios": ["chefe@exemplo.com"]},
+        lambda: {
+            "limiar": 50.0,
+            "email_configurado": True,
+            "destinatarios": ["chefe@exemplo.com"],
+            "calibragem": CALIBRAGEM_LIMIAR_INALCANCAVEL,
+        },
     )
     monkeypatch.setattr(
         api_client,
@@ -473,7 +480,12 @@ def test_tela_alertas_avisa_quando_smtp_nao_esta_configurado(monkeypatch):
     monkeypatch.setattr(
         api_client,
         "config_de_alertas",
-        lambda: {"limiar": 50.0, "email_configurado": False, "destinatarios": []},
+        lambda: {
+            "limiar": 50.0,
+            "email_configurado": False,
+            "destinatarios": [],
+            "calibragem": CALIBRAGEM_LIMIAR_INALCANCAVEL,
+        },
     )
 
     app = rodar_tela("tela_alertas")
@@ -606,17 +618,6 @@ def test_cache_diferencia_filtros_com_lista(monkeypatch):
 def test_alerta_avisa_quando_o_limiar_e_inalcancavel(monkeypatch):
     """Achado em produção: limiar 50 com maior score real 5,98 — o alerta ficava
     ligado e mudo para sempre, sem nada na tela explicando por quê."""
-    monkeypatch.setattr(
-        api_client,
-        "listar_canais",
-        lambda **kwargs: {
-            "total": 1,
-            "limit": 50,
-            "offset": 0,
-            "items": [] if kwargs.get("min_score") else [CANAL | {"total_score": 5.98}],
-        },
-    )
-
     app = rodar_tela("tela_alertas")
 
     assert not app.exception
@@ -629,7 +630,19 @@ def test_alerta_nao_avisa_quando_o_limiar_e_alcancavel(monkeypatch):
     monkeypatch.setattr(
         api_client,
         "config_de_alertas",
-        lambda: {"limiar": 5.0, "email_configurado": True, "destinatarios": ["chefe@exemplo.com"]},
+        lambda: {
+            "limiar": 5.0,
+            "email_configurado": True,
+            "destinatarios": ["chefe@exemplo.com"],
+            "calibragem": {
+                "canais_com_score": 71,
+                "canais_acima_do_limiar": 12,
+                "score_p50": 1.81,
+                "score_p90": 7.05,
+                "score_p99": 13.25,
+                "score_maximo": 17.48,
+            },
+        },
     )
 
     app = rodar_tela("tela_alertas")
@@ -722,3 +735,32 @@ def test_a_interface_nao_usa_emoji():
     ]
 
     assert not desvios, "emoji na interface:\n" + "\n".join(desvios)
+
+
+def test_o_entrypoint_copia_todo_segredo_que_o_dashboard_usa():
+    """`streamlit_app.py` copia uma lista explícita de segredos para o ambiente
+    antes de importar o app (a ordem importa — ver o docstring de lá). A lista
+    ser explícita é proposital, mas cria um jeito silencioso de errar: segredo
+    novo que o dashboard lê e que ninguém somou aqui fica configurado no
+    Streamlit Cloud e mesmo assim nunca chega ao `settings`.
+
+    Aconteceu com o API_WRITE_TOKEN. A tela responderia 401 sem nenhuma pista
+    de que o problema era a cópia, não o valor.
+    """
+    raiz = Path(__file__).resolve().parents[1]
+    entrypoint = (raiz / "streamlit_app.py").read_text(encoding="utf-8")
+    cliente = (raiz / "src" / "dashboard" / "api_client.py").read_text(encoding="utf-8")
+    tela = (raiz / "src" / "dashboard" / "app.py").read_text(encoding="utf-8")
+
+    usados = {
+        campo.upper()
+        for campo in Settings.model_fields
+        if f"settings.{campo}" in cliente or f"settings.{campo}" in tela
+    }
+
+    ausentes = sorted(campo for campo in usados if campo not in entrypoint)
+
+    assert not ausentes, (
+        f"o dashboard lê {ausentes}, mas streamlit_app.py não copia do st.secrets — "
+        "no Streamlit Cloud essas variáveis nunca chegam ao settings"
+    )

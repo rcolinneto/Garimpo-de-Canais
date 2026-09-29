@@ -109,12 +109,31 @@ class AlertaEnviado(BaseModel):
     channel_out: str
 
 
+class CalibragemDoLimiar(BaseModel):
+    """O limiar de alerta confrontado com os scores que existem de verdade.
+
+    Um limiar acima do topo da distribuição não dá erro: ele simplesmente nunca
+    dispara, e o recurso parece ligado enquanto está mudo. Estes números
+    existem para que isso seja visível na tela em vez de descoberto meses
+    depois — "o limiar é 50, o 99º percentil é 25,3 e 1 canal passa" conta a
+    história inteira num relance.
+    """
+
+    canais_com_score: int
+    canais_acima_do_limiar: int
+    score_p50: float | None = None
+    score_p90: float | None = None
+    score_p99: float | None = None
+    score_maximo: float | None = None
+
+
 class AlertaConfig(BaseModel):
     """Como o alerta está configurado hoje (Tela 5)."""
 
     limiar: float
     email_configurado: bool
     destinatarios: list[str]
+    calibragem: CalibragemDoLimiar
 
 
 class BuscaAgoraResposta(BaseModel):

@@ -19,7 +19,11 @@ Este documento consolida, em um único lugar, requisitos que hoje aparecem espal
 - Nenhum segredo (chave da API do YouTube, credenciais de banco, credenciais SMTP) em código-fonte ou versionado no git — sempre via `.env`, com `.env.example` documentando as chaves sem valores reais.
 - Chave da API do YouTube restrita, no Google Cloud Console, apenas à YouTube Data API v3 (ver histórico de configuração — já aplicado neste projeto).
 - Dashboard protegido por senha (mínimo aceitável para uso interno de pequeno time); reavaliar para autenticação individual se o número de usuários crescer.
-- Acesso ao banco de produção restrito à rede interna da aplicação (não exposto publicamente na internet).
+- **A senha do dashboard protege a interface, não a API.** Dashboard e API são deploys separados e não há rede privada entre eles no plano gratuito, então a API é alcançável por quem souber a URL. Corrigido em 2026-09-29, depois de a revisão encontrar `POST /nichos` e `POST /nichos/{id}/buscar-agora` abertos: um POST sem cabeçalho nenhum criou um nicho e disparou uma busca real que gastou 181 unidades de cota em 20 segundos.
+- As **escritas** exigem `API_WRITE_TOKEN` (cabeçalho `X-Api-Token`), com o mesmo valor na API e no dashboard, comparado com `hmac.compare_digest`. Falha fechada: sem a variável configurada, ninguém escreve.
+- O token de escrita é **separado do `CRON_SECRET`** de propósito — são portadores diferentes (o de cron mora no cron-job.org, o de escrita nos secrets do dashboard), e um segredo só para dois níveis de confiança faz com que vazar um entregue o outro.
+- As **leituras** seguem abertas: o dado é sobre canais públicos do YouTube, e exigir token nelas pararia o dashboard inteiro sem ganho proporcional. Se isso mudar, muda junto com uma rodada de alinhamento.
+- Acesso ao banco de produção restrito à rede interna da aplicação (não exposto publicamente na internet). Na hospedagem gratuita atual o banco é o Neon, alcançado por credencial em variável de ambiente e TLS — não há rede privada entre serviços, então a credencial é o único controle.
 
 ## Disponibilidade e confiabilidade
 

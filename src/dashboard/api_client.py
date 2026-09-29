@@ -92,6 +92,15 @@ def _tratar(resposta: requests.Response) -> Any:
                 f"{'.'.join(str(parte) for parte in erro.get('loc', [])[1:])}: {erro.get('msg')}"
                 for erro in detalhe
             )
+        if resposta.status_code == 401 and not settings.api_write_token:
+            # Distinção que só o dashboard sabe fazer: a API responde igual para
+            # "token errado" e "token ausente", mas daqui dá para ver que o
+            # problema é a configuração deste lado, não o valor enviado.
+            detalhe = (
+                "Esta ação escreve na API e exige o API_WRITE_TOKEN, que não está "
+                "configurado neste dashboard. Defina a variável com o mesmo valor "
+                "usado na API."
+            )
         raise ApiError(detalhe or f"Erro HTTP {resposta.status_code}")
     return resposta.json()
 
@@ -119,8 +128,24 @@ def _desistiu_ha_pouco() -> bool:
     )
 
 
+def _cabecalhos_de_escrita(metodo: str) -> dict[str, str]:
+    """Token de escrita, nas requisições que escrevem.
+
+    Decidido pelo método HTTP e não por uma lista de rotas: assim um endpoint
+    de escrita novo já nasce mandando o cabeçalho, em vez de descobrir que
+    esqueceram dele quando a tela devolve 401 em produção.
+    """
+    if metodo.upper() == "GET" or not settings.api_write_token:
+        return {}
+    return {"X-Api-Token": settings.api_write_token}
+
+
 def _requisitar(metodo: str, path: str, timeout: float = TIMEOUT_SEGUNDOS, **kwargs) -> Any:
     global _ultima_desistencia
+
+    cabecalhos = _cabecalhos_de_escrita(metodo)
+    if cabecalhos:
+        kwargs["headers"] = {**kwargs.get("headers", {}), **cabecalhos}
 
     # Se a chamada anterior já esperou a janela inteira e a API não voltou, não
     # adianta esta esperar tudo de novo: falha na hora para a tela conseguir

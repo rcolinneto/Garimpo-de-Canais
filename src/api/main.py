@@ -126,6 +126,35 @@ def _verificar_cron_secret(recebido: str | None) -> None:
         raise HTTPException(status_code=401, detail="Segredo de cron ausente ou inválido")
 
 
+def _verificar_token_de_escrita(recebido: str | None) -> None:
+    """Protege as escritas: criar/editar nicho e a busca sob demanda.
+
+    A API é pública (o dashboard e ela são deploys separados, e não há rede
+    privada entre eles no plano gratuito). A senha do dashboard protege a
+    interface, nunca protegeu a API — quem souber a URL escrevia direto.
+
+    O caso caro não é o nicho criado à toa, é o `buscar-agora`: cada chamada
+    gasta 100 das 10.000 unidades diárias da YouTube API. Umas 100 requisições
+    zeram a coleta do dia, e o sistema fica cego sem nenhum erro aparente.
+
+    Fecha por padrão, igual ao cron: sem API_WRITE_TOKEN configurado ninguém
+    escreve. Um "libera enquanto não configurar" seria o tipo de padrão seguro
+    que nunca é apertado depois.
+    """
+    if (
+        not settings.api_write_token
+        or not recebido
+        or not hmac.compare_digest(recebido, settings.api_write_token)
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail=(
+                "Escrita não autorizada. Configure API_WRITE_TOKEN com o mesmo "
+                "valor na API e no dashboard."
+            ),
+        )
+
+
 @app.post("/cron/discovery", status_code=202)
 def cron_discovery(
     background_tasks: BackgroundTasks,
@@ -348,7 +377,11 @@ def ranking_de_nichos(
 
 
 @app.post("/nichos/{niche_id}/buscar-agora", response_model=BuscaAgoraResposta)
-def buscar_nicho_agora(niche_id: int, session=Depends(get_session)) -> BuscaAgoraResposta:
+def buscar_nicho_agora(
+    niche_id: int,
+    session=Depends(get_session),
+    x_api_token: str | None = Header(default=None, alias="X-Api-Token"),
+) -> BuscaAgoraResposta:
     """Tela 2 — dispara agora uma busca real no YouTube para um nicho, sem
     esperar o job agendado (3h/5h).
 
@@ -359,6 +392,8 @@ def buscar_nicho_agora(niche_id: int, session=Depends(get_session)) -> BuscaAgor
     do horário agendado. Usa o mesmo teto de cota do job de descoberta, para um
     clique não conseguir estourar a cota do dia sozinho.
     """
+    _verificar_token_de_escrita(x_api_token)
+
     nicho = session.get(Niche, niche_id)
     if nicho is None:
         raise HTTPException(status_code=404, detail="Nicho não encontrado")
@@ -449,12 +484,20 @@ def listar_alertas(
 
 
 @app.get("/alertas/config", response_model=AlertaConfig)
-def configuracao_de_alertas() -> AlertaConfig:
-    """Tela 5 — limiar vigente e se o envio por e-mail está de fato configurado."""
+def configuracao_de_alertas(session=Depends(get_session)) -> AlertaConfig:
+    """Tela 5 — limiar vigente, envio de e-mail e a calibragem do limiar.
+
+    A calibragem vai junto de propósito: sem ela a tela mostra um número solto
+    ("limiar: 50") que não deixa ninguém perceber que ele está acima de tudo o
+    que o sistema pontua — o alerta fica mudo sem nunca dar erro.
+    """
     return AlertaConfig(
         limiar=settings.alert_score_threshold,
         email_configurado=smtp_configurado(),
         destinatarios=destinatarios(),
+        calibragem=queries.alert_threshold_calibration(
+            session, settings.alert_score_threshold
+        ),
     )
 
 
@@ -542,8 +585,14 @@ def _nome_ja_usado(session, nome: str, ignorar_id: int | None = None) -> bool:
 
 
 @app.post("/nichos", response_model=NichoResposta, status_code=201)
-def criar_nicho(payload: NichoCreate, session=Depends(get_session)) -> Niche:
+def criar_nicho(
+    payload: NichoCreate,
+    session=Depends(get_session),
+    x_api_token: str | None = Header(default=None, alias="X-Api-Token"),
+) -> Niche:
     """Tela 4 — cadastra um nicho novo."""
+    _verificar_token_de_escrita(x_api_token)
+
     nome = payload.name.strip()
     if _nome_ja_usado(session, nome):
         raise HTTPException(status_code=409, detail="Já existe um nicho com esse nome")
@@ -560,9 +609,14 @@ def criar_nicho(payload: NichoCreate, session=Depends(get_session)) -> Niche:
 
 @app.put("/nichos/{niche_id}", response_model=NichoResposta)
 def atualizar_nicho(
-    niche_id: int, payload: NichoUpdate, session=Depends(get_session)
+    niche_id: int,
+    payload: NichoUpdate,
+    session=Depends(get_session),
+    x_api_token: str | None = Header(default=None, alias="X-Api-Token"),
 ) -> Niche:
     """Tela 4 — edita ou pausa um nicho (pausar = active=false, preserva histórico)."""
+    _verificar_token_de_escrita(x_api_token)
+
     nicho = session.get(Niche, niche_id)
     if nicho is None:
         raise HTTPException(status_code=404, detail="Nicho não encontrado")

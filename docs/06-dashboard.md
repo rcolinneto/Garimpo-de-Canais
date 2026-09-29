@@ -68,6 +68,27 @@ Isso torna a **ordenação crítica**. Sem filtro humano antes, o `opportunity_s
 
 **Regra que vale aqui igual às outras telas**: nenhuma brecha aparece sem a evidência que a sustenta. Um número de oportunidade sem a prova ao lado seria um palpite com aparência de dado.
 
+## Calibragem do limiar de alerta (Tela 5)
+
+A Tela 5 mostra, junto do limiar vigente, quantos canais de fato o cruzam e como
+os scores se distribuem (mediana, 90º e 99º percentis, máximo).
+
+Existe porque um limiar acima do topo da distribuição **não dá erro** — ele
+simplesmente nunca dispara, e o recurso parece ligado enquanto está mudo. Foi o
+que aconteceu: `ALERT_SCORE_THRESHOLD` nasceu em 50 numa escala de 0 a 100, mas
+o score depende de crescimento percentual entre snapshots e na prática se
+concentra bem embaixo — em produção o maior score real foi 5,98; na base de
+desenvolvimento, 17,48. Nos dois casos, zero canais acima de 50.
+
+Os números vêm em `GET /alertas/config`, na mesma requisição que a tela já fazia.
+São do **último score de cada canal**, não do histórico de `channel_scores`:
+contar as linhas responderia "quantas vezes alguém já pontuou", não "quantos
+canais disparam".
+
+Escolher o valor certo continua sendo decisão de quem usa — a tela tem a
+simulação ao lado para isso. O que o sistema garante é que ninguém descubra
+meses depois que o alerta estava mudo.
+
 ## Convenções visuais
 
 Decidido em 2026-09-29, a pedido do dono do produto ("design melhor, sem emoji,

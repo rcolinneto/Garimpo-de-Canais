@@ -174,6 +174,9 @@ def _seed(session) -> dict:
     }
 
 
+TOKEN_DE_ESCRITA_NOS_TESTES = "token-de-escrita-dos-testes"
+
+
 @pytest.fixture()
 def api():
     falha = erro_de_conexao(DATABASE_URL)
@@ -188,8 +191,20 @@ def api():
     ids = _seed(session)
     app.dependency_overrides[get_session] = lambda: session
 
-    yield TestClient(app), ids
+    # O token de escrita vai configurado e já no cabeçalho padrão do cliente:
+    # assim os testes de escrita continuam testando o que testavam (o
+    # comportamento do endpoint), e não a autenticação. Quem quer exercitar a
+    # guarda em si tira o cabeçalho explicitamente — ver os testes de 401.
+    token_original = settings.api_write_token
+    settings.api_write_token = TOKEN_DE_ESCRITA_NOS_TESTES
+    client = TestClient(app)
+    client.headers["X-Api-Token"] = TOKEN_DE_ESCRITA_NOS_TESTES
 
+    yield client, ids
+
+    # Restaurado: `settings` é global do processo e um vazamento daqui mudaria
+    # o comportamento dos testes do dashboard, que leem a mesma configuração.
+    settings.api_write_token = token_original
     app.dependency_overrides.clear()
     session.close()
     transaction.rollback()
@@ -694,12 +709,31 @@ def test_coletas_expoe_o_estado_dos_jobs(api):
 
     coletas = client.get("/coletas").json()
 
-    # Mais recente primeiro
-    assert coletas[0]["job_type"] == "snapshot"
-    assert coletas[0]["status"] == "success"
-    assert coletas[0]["items_processed"] == 37
-    assert coletas[1]["status"] == "failed"
-    assert coletas[1]["error_message"] == "cota esgotada"
+    # As linhas semeadas são localizadas pelo conteúdo, não pela posição: o
+    # endpoint lê a tabela real e qualquer coleta de verdade mais nova que a
+    # semente entra na frente. A versão anterior assumia `coletas[0]` e
+    # quebrou assim que uma rodada real caiu no banco de desenvolvimento —
+    # falha que não dizia nada sobre o endpoint, só sobre o teste.
+    def uma(**criterios):
+        achadas = [
+            linha
+            for linha in coletas
+            if all(linha.get(campo) == valor for campo, valor in criterios.items())
+        ]
+        assert len(achadas) == 1, f"esperava 1 linha com {criterios}, achei {len(achadas)}"
+        return achadas[0]
+
+    sucesso = uma(status="success", items_processed=37)
+    assert sucesso["job_type"] == "snapshot"
+    assert sucesso["api_units_consumed"] == 42
+
+    falha = uma(status="failed", error_message="cota esgotada")
+    assert falha["job_type"] == "discovery"
+
+    # A ordenação continua sendo contrato do endpoint, verificada sobre a
+    # lista inteira em vez de sobre um índice fixo.
+    inicios = [linha["started_at"] for linha in coletas]
+    assert inicios == sorted(inicios, reverse=True)
 
 
 def test_outliers_do_canal_expoe_o_calculo_junto_com_a_nota(api):
@@ -786,3 +820,128 @@ def test_migrations_podem_ser_desligadas(monkeypatch):
         pass
 
     assert chamou == []
+
+
+# --- Proteção das escritas ----------------------------------------------------
+#
+# A API é pública: dashboard e API são deploys separados e não há rede privada
+# entre eles no plano gratuito. A senha do dashboard protege a interface, nunca
+# protegeu a API. O caso caro é o `buscar-agora` — 100 das 10.000 unidades
+# diárias por chamada, ou seja, ~100 requisições de qualquer um zeram a coleta
+# do dia e o sistema fica cego sem erro aparente.
+
+
+def test_escrita_sem_token_configurado_da_401(api, monkeypatch):
+    """Falha fechada: sem API_WRITE_TOKEN ninguém escreve, nem mandando token."""
+    client, _ = api
+    monkeypatch.setattr(settings, "api_write_token", "")
+
+    resposta = client.post(
+        "/nichos",
+        json={"name": "nicho de teste sem token", "keywords": ["x"], "active": False},
+        headers={"X-Api-Token": "qualquer-coisa"},
+    )
+
+    assert resposta.status_code == 401
+
+
+def test_escrita_sem_cabecalho_da_401(api, monkeypatch):
+    """O caso que existia de verdade antes desta guarda: POST cru, sem nada."""
+    client, _ = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+    client.headers.pop("X-Api-Token", None)
+
+    resposta = client.post(
+        "/nichos", json={"name": "nicho sem cabecalho", "keywords": ["x"], "active": False}
+    )
+
+    assert resposta.status_code == 401
+
+
+def test_escrita_com_token_errado_da_401(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+
+    resposta = client.post(
+        "/nichos",
+        json={"name": "nicho token errado", "keywords": ["x"], "active": False},
+        headers={"X-Api-Token": "token-errado"},
+    )
+
+    assert resposta.status_code == 401
+
+
+def test_escrita_com_token_certo_passa(api, monkeypatch):
+    client, _ = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+
+    resposta = client.post(
+        "/nichos",
+        json={"name": "nicho token certo", "keywords": ["x"], "active": False},
+        headers={"X-Api-Token": "token-certo"},
+    )
+
+    assert resposta.status_code == 201, resposta.text
+
+
+def test_buscar_agora_exige_token(api, monkeypatch):
+    """O endpoint caro. Precisa recusar ANTES de gastar cota — por isso o
+    teste não monkeypatcha o collector: se a guarda deixasse passar, a chamada
+    real apareceria como erro aqui em vez de como cota queimada em produção."""
+    client, ids = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+    client.headers.pop("X-Api-Token", None)
+
+    resposta = client.post(f"/nichos/{ids['nicho_financas']}/buscar-agora")
+
+    assert resposta.status_code == 401
+
+
+def test_edicao_de_nicho_exige_token(api, monkeypatch):
+    client, ids = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+    client.headers.pop("X-Api-Token", None)
+
+    resposta = client.put(f"/nichos/{ids['nicho_financas']}", json={"active": False})
+
+    assert resposta.status_code == 401
+
+
+def test_leitura_nao_exige_token(api, monkeypatch):
+    """A proteção é das escritas. Se pegasse leitura junto, o dashboard inteiro
+    pararia — e o dado aqui é sobre canais públicos do YouTube."""
+    client, _ = api
+    monkeypatch.setattr(settings, "api_write_token", "token-certo")
+
+    assert client.get("/canais").status_code == 200
+    assert client.get("/nichos/ranking").status_code == 200
+    assert client.get("/health").status_code == 200
+
+
+def test_config_de_alertas_traz_a_calibragem_do_limiar(api, monkeypatch):
+    """Um limiar acima de tudo o que o sistema pontua não dá erro: fica mudo.
+    A tela só consegue avisar se a API disser quantos canais passam de fato."""
+    client, _ = api
+    monkeypatch.setattr(settings, "alert_score_threshold", 50.0)
+
+    calibragem = client.get("/alertas/config").json()["calibragem"]
+
+    assert calibragem["canais_com_score"] > 0
+    assert calibragem["canais_acima_do_limiar"] == 0
+    # Percentis ordenados — se vierem trocados, a tela conta a história errada.
+    assert calibragem["score_p50"] <= calibragem["score_p90"] <= calibragem["score_p99"]
+    assert calibragem["score_p99"] <= calibragem["score_maximo"]
+    assert calibragem["score_maximo"] < 50.0
+
+
+def test_calibragem_conta_canais_e_nao_linhas_de_historico(api, monkeypatch):
+    """`channel_scores` guarda histórico: um canal pontuado cinco vezes tem
+    cinco linhas. Contar linhas responderia "quantas vezes alguém já pontuou",
+    não "quantos canais disparam" — que é a pergunta da tela."""
+    client, _ = api
+    monkeypatch.setattr(settings, "alert_score_threshold", 0.0)
+
+    calibragem = client.get("/alertas/config").json()["calibragem"]
+    total_de_canais = client.get("/canais", params={"limit": 1}).json()["total"]
+
+    assert calibragem["canais_com_score"] == total_de_canais

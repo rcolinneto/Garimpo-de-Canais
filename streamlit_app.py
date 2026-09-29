@@ -30,9 +30,17 @@ except Exception:  # noqa: BLE001
     # StreamlitSecretNotFoundError aqui — confirmado testando, não suposto.
     segredos = {}
 
-# Só o que a tela usa: a API e a senha. Nada de credencial de banco, chave do
-# YouTube ou SMTP — quem precisa disso é a API, que roda em outro lugar.
-for chave in ("API_BASE_URL", "DASHBOARD_PASSWORD"):
+# Só o que a tela usa: o endereço da API, a senha e o token de escrita. Nada de
+# credencial de banco, chave do YouTube ou SMTP — quem precisa disso é a API,
+# que roda em outro lugar.
+#
+# A lista é explícita e não um "copia tudo" porque é ela que garante que um
+# segredo colocado aqui por engano não vire variável de ambiente do dashboard.
+# O preço é que um segredo novo precisa ser somado aqui à mão — foi o que quase
+# aconteceu com o API_WRITE_TOKEN, que sem esta linha seria configurado no
+# Streamlit e mesmo assim nunca chegaria ao `settings`, deixando a Tela 4 em 401
+# sem nenhuma pista do motivo.
+for chave in ("API_BASE_URL", "DASHBOARD_PASSWORD", "API_WRITE_TOKEN"):
     if chave in segredos:
         os.environ[chave] = str(segredos[chave])
 

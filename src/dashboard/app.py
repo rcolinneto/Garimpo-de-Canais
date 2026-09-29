@@ -1042,16 +1042,34 @@ def tela_alertas() -> None:
     # A escala do score é 0-100, mas na prática os valores se concentram bem
     # embaixo (dependem de crescimento percentual entre snapshots). Um limiar
     # acima do teto real deixa o alerta ligado e mudo para sempre, sem nada na
-    # tela explicando por quê — este aviso torna isso visível.
-    topo = carregar(api_client.listar_canais, limit=1)
-    maior_score = topo["items"][0]["total_score"] if topo and topo["items"] else None
-    if maior_score is not None and limiar_vigente > maior_score:
+    # tela explicando por quê — este bloco torna isso visível.
+    #
+    # Os números vêm junto com a configuração, na mesma requisição: antes a
+    # tela buscava o canal de maior score numa chamada extra só para comparar,
+    # e mesmo assim só sabia dizer o máximo.
+    calibragem = config["calibragem"]
+    maior_score = calibragem["score_maximo"]
+    acima = calibragem["canais_acima_do_limiar"]
+
+    if calibragem["canais_com_score"] == 0:
+        st.info("Ainda não há canais pontuados — sem isso não dá para calibrar o limiar.")
+    elif acima == 0:
         st.warning(
             f"**Nenhum alerta pode disparar com a configuração atual.** O limiar é "
-            f"{_arredondar(limiar_vigente)}, mas o maior score entre os canais "
-            f"monitorados hoje é {_arredondar(maior_score)} — nenhum canal chega perto. "
+            f"{_arredondar(limiar_vigente)} e o maior score entre os canais monitorados "
+            f"hoje é {_arredondar(maior_score)} — nenhum canal chega perto. "
+            f"Metade dos canais está abaixo de {_arredondar(calibragem['score_p50'])} e "
+            f"só 10% passam de {_arredondar(calibragem['score_p90'])}. "
             "Use a simulação abaixo para achar um valor que selecione os canais certos "
             "e então ajuste ALERT_SCORE_THRESHOLD para ele."
+        )
+    else:
+        st.caption(
+            f"Com o limiar em {_arredondar(limiar_vigente)}, {acima} de "
+            f"{calibragem['canais_com_score']} canais disparam alerta. "
+            f"Mediana {_arredondar(calibragem['score_p50'])} · "
+            f"90% abaixo de {_arredondar(calibragem['score_p90'])} · "
+            f"máximo {_arredondar(maior_score)}."
         )
 
     limiar = st.number_input(
